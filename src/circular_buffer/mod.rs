@@ -144,6 +144,7 @@ impl<T> CircularBuffer<T> {
     ///     assert_eq!(buffer_vec[i], 0);
     /// }
     /// ```
+    #[inline]
     pub fn to_vec(&self) -> Vec<T> {
         let mut destination = Vec::with_capacity(self.capacity as usize);
         unsafe {

@@ -18,23 +18,26 @@
 
 pub mod float_filter;
 
-use super::super::dot_product::{DotProduct, Direction};
-use super::super::circular_buffer::CircularBuffer;
+use super::super::dot_product::{DotProduct, Direction, execute::Execute};
+use super::super::window::Window;
+use super::super::resources::msb_index;
 
 use std::fmt;
-use std::error::Error;
-use std::ops::{Mul};
+use std::iter::Sum;
+
+use num::complex::Complex;
+use num_traits::{Num, Float};
 
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct FIRFilter<C> {
     coefs: Vec<C>,
     scale: C,
-    window: CircularBuffer<C>,
+    window: Window<Complex<C>>,
     dot_product: DotProduct<C>
 }
 
-impl<C: Clone + Copy + Mul + std::iter::Sum<<C as std::ops::Mul>::Output>> FIRFilter<C> {
+impl<C: Clone + Float + Sum + Num> FIRFilter<C> {
     /// Constructs a new, `FIRFilter<C>`
     /// 
     /// Uses the input which represents the discrete coeficients of type `C` 
@@ -51,7 +54,7 @@ impl<C: Clone + Copy + Mul + std::iter::Sum<<C as std::ops::Mul>::Output>> FIRFi
         FIRFilter {
             coefs: coefficents.to_vec(),
             scale: scale,
-            window: CircularBuffer::new(1 << msb_index(coefficents.len())),
+            window: Window::new(1 << msb_index(coefficents.len()), 0),
             dot_product: DotProduct::new(coefficents.to_vec(), Direction::REVERSE)
         }
     }
@@ -69,7 +72,8 @@ impl<C: Clone + Copy + Mul + std::iter::Sum<<C as std::ops::Mul>::Output>> FIRFi
     /// filter.set_scale(2.0);
     /// 
     /// assert_eq!(filter.get_scale(), 2.0);
-    /// ````
+    /// ```
+    #[inline(always)]
     pub fn set_scale(&mut self, scale: C) {
         self.scale = scale;
     }
@@ -86,43 +90,44 @@ impl<C: Clone + Copy + Mul + std::iter::Sum<<C as std::ops::Mul>::Output>> FIRFi
     /// let filter = FIRFilter::<f32>::new(&coefficients, 1.0);
     /// assert_eq!(filter.get_scale(), 1.0);
     /// ```
+    #[inline(always)]
     pub fn get_scale(&self) -> C {
         self.scale
     }
 
     /// Pushes a sample _x_ onto the internal buffer of the filter object
     /// 
-    /// Returns an [`super::super::circular_buffer::BufferError`] if the window buffer cannot be applied to.
-    /// Otherwise returns nothing.
-    /// 
     /// # Example
     /// 
     /// ```
     /// use solid::filter::fir_filter::FIRFilter;
+    /// use num::Complex;
+    /// 
     /// let coefficients: [f32; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
     /// let mut filter = FIRFilter::<f32>::new(&coefficients, 1.0);
-    /// filter.push(4.0);
+    /// filter.push(Complex::new(4.0, 0.0));
     /// ```
-    pub fn push(&mut self, sample: C) -> Result<(), Box<dyn Error>> {
-        self.window.push(sample)
+    #[inline(always)]
+    pub fn push(&mut self, sample: Complex<C>) {
+        self.window.push(sample);
     }
 
-    /// Writes to the sample onto the internal buffer of the filter object
-    /// 
-    /// Returns an [`super::super::circular_buffer::BufferError`] if the window buffer cannot be applied to.
-    /// Otherwise returns nothing.
+    /// Writes the samples onto the internal buffer of the filter object
     /// 
     /// # Example
     /// 
     /// ```
     /// use solid::filter::fir_filter::FIRFilter;
+    /// use num::Complex;
+    /// 
     /// let coefficients: [f32; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
     /// let mut filter = FIRFilter::<f32>::new(&coefficients, 1.0);
-    /// let window = [2.02, 4.04];
-    /// filter.write(window.as_ptr(), 2);
+    /// let window = [Complex::new(2.02, 0.0), Complex::new(4.04, 0.0)];
+    /// filter.write(&window);
     /// ```
-    pub fn write(&mut self, samples: *const C, size: usize) -> Result<(), Box<dyn Error>> {
-        self.window.write(samples, size)
+    #[inline(always)]
+    pub fn write(&mut self, samples: &[Complex<C>]) {
+        self.window.write(samples)
     }
 
     /// Computes the output sample
@@ -134,16 +139,20 @@ impl<C: Clone + Copy + Mul + std::iter::Sum<<C as std::ops::Mul>::Output>> FIRFi
     /// 
     /// ```
     /// use solid::filter::fir_filter::FIRFilter;
+    /// use num::Complex;
+    /// 
     /// let coefficients: [f32; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
     /// let mut filter = FIRFilter::<f32>::new(&coefficients, 1.0);
-    /// let window = [2.02, 4.04, 1.02, 0.23, 9.19];
-    /// filter.write(window.as_ptr(), 5);
+    /// let window = [Complex::new(2.02, 0.0), Complex::new(4.04, 0.0), Complex::new(1.02, 0.0),
+    ///     Complex::new(0.23, 0.0), Complex::new(9.19, 0.0)];
+    /// filter.write(&window);
     /// let output = filter.execute();
     /// 
-    /// assert_eq!(output as i64, 38);
+    /// assert_eq!(output.re.round(), 60.0);
     /// ```
-    pub fn execute(&self) -> C::Output {
-        let product = self.dot_product.execute(&self.window.to_vec()) * self.scale;
+    #[inline(always)]
+    pub fn execute(&self) -> Complex<C> {
+        let product = Execute::execute(&self.dot_product, &self.window.to_vec()) * self.scale;
         product
     }
 
@@ -156,27 +165,26 @@ impl<C: Clone + Copy + Mul + std::iter::Sum<<C as std::ops::Mul>::Output>> FIRFi
     /// 
     /// ```
     /// use solid::filter::fir_filter::FIRFilter;
+    /// use num::Complex;
+    /// 
     /// let coefficients: [f32; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
     /// let mut filter = FIRFilter::<f32>::new(&coefficients, 1.0);
-    /// let window = [2.02, 4.04, 1.02, 0.23];
-    /// filter.write(window.as_ptr(), 4);
-    /// let output = match filter.execute_block(vec![9.19, 1.2, 3.02, 0.3, 90.0]) {
-    ///     Ok(output) => output,
-    ///     Err(_) => vec![0.0]
-    /// };
+    /// let window = [Complex::new(2.02, 0.0), Complex::new(4.04, 0.0), 
+    ///     Complex::new(1.02, 0.0), Complex::new(0.23, 0.0)];
+    /// filter.write(&window);
+    /// let output = filter.execute_block(&vec![Complex::new(9.19, 0.0), Complex::new(1.2, 0.0), 
+    ///         Complex::new(3.02, 0.0), Complex::new(0.3, 0.0), Complex::new(90.0, 0.0)]);
     /// 
-    /// assert_eq!(output[0] as i64, 38);
+    /// assert_eq!(output[0], Complex::new(60.029995, 0.0));
     /// ```
-    pub fn execute_block(&mut self, samples: Vec<C>) -> Result<Vec<C::Output>, Box<dyn Error>> {
-        let mut block: Vec<C::Output> = vec![];
+    #[inline(always)]
+    pub fn execute_block(&mut self, samples: &[Complex<C>]) -> Vec<Complex<C>> {
+        let mut block: Vec<Complex<C>> = vec![];
         for i in 0..samples.len() {
-            if self.window.is_full() {
-                self.window.pop()?;
-            }
-            self.push(samples[i])?;
+            self.push(samples[i]);
             block.push(self.execute());
         }
-        Ok(block)
+        block
     }
 
     /// Gets the length of the coefficients
@@ -191,6 +199,7 @@ impl<C: Clone + Copy + Mul + std::iter::Sum<<C as std::ops::Mul>::Output>> FIRFi
     /// 
     /// assert_eq!(len, 12);
     /// ```
+    #[inline(always)]
     pub fn len(&self) -> usize {
         self.coefs.len()
     }
@@ -207,40 +216,23 @@ impl<C: Clone + Copy + Mul + std::iter::Sum<<C as std::ops::Mul>::Output>> FIRFi
     /// 
     /// assert_eq!(coefs, *ref_coefs);
     /// ```
+    #[inline(always)]
     pub fn coefficients(&self) -> &Vec<C> {
         &self.coefs
     }
 }
 
-impl<C: Clone + fmt::Debug + fmt::Display> fmt::Display for FIRFilter<C> {
+pub type FirFilter32 = FIRFilter<f32>;
+pub type FirFilter64 = FIRFilter<f64>;
+
+impl<C: Clone + fmt::Debug + fmt::Display + Copy> fmt::Display for FIRFilter<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, 
 r#"FIR Filter 
 Filter Type: {}
 Coefficients: {:.4?}
-Window: {}
+Window: {:.4?}
 "#, 
-            std::any::type_name::<C>(), self.coefs, self.window)
+            std::any::type_name::<C>(), self.coefs, self.window.to_vec())
     }
-}
-
-
-/// Gets the leading index bit location
-/// TODO: move this to own file
-/// 
-/// # Example
-/// 
-/// ```
-/// use solid::filter::fir_filter::msb_index;
-/// let value = 0b1;
-/// let index = msb_index(value);
-/// assert_eq!(index, 1);
-/// 
-/// let value = 129;
-/// let index = msb_index(value);
-/// assert_eq!(index, 8);
-/// 
-/// ```
-pub fn msb_index(x: usize) -> usize {
-    (usize::BITS - x.leading_zeros()) as usize
 }

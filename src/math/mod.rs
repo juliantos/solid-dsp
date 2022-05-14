@@ -1,3 +1,5 @@
+pub mod complex;
+
 use std::f64::consts::PI as PI_64;
 use std::f32::consts::PI as PI_32;
 
@@ -7,6 +9,7 @@ pub trait Sinc<T> {
 }
 
 impl Sinc<f64> for f64 {
+    #[inline]
     fn sinc(&self) -> f64 {
         if self.abs() < 0.01 {
             return (PI_64 * self / 2.0).cos() * (PI_64 * self / 4.0).cos() * (PI_64 * self / 8.0).cos()
@@ -16,6 +19,7 @@ impl Sinc<f64> for f64 {
 }
 
 impl Sinc<f32> for f32 {
+    #[inline]
     fn sinc(&self) -> f32 {
         if self.abs() < 0.01 {
             return (PI_32 * self / 2.0).cos() * (PI_32 * self / 4.0).cos() * (PI_32 * self / 8.0).cos()

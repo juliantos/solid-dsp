@@ -17,7 +17,9 @@
 pub mod execute;
 
 use std::fmt;
-use std::ops::{Mul};
+use std::iter::Sum;
+
+use num_traits::Num;
 
 pub enum Direction {
     FORWARD,
@@ -30,7 +32,7 @@ pub struct DotProduct<T> {
     coef: Vec<T>
 }
 
-impl<T: Mul + Copy + std::iter::Sum<<T as std::ops::Mul>::Output>> DotProduct<T> {
+impl<T: Num + Sum + Copy> DotProduct<T> {
     /// Creates a new Dot Product
     /// 
     /// Inserts the coefficients in the [`Direction`] specified. 
@@ -68,6 +70,7 @@ impl<T: Mul + Copy + std::iter::Sum<<T as std::ops::Mul>::Output>> DotProduct<T>
     /// assert_eq!(exe, 15.0);
     /// ```
     /// TODO: SIMD, rebuild with different archs in mind
+    #[inline(always)]
     pub fn execute(&self, samples: &[T]) -> T {
         let product: T = self.coef.iter().zip(samples.iter()).map(|(&x, &y)| x * y).sum();
         product
