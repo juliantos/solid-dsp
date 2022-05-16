@@ -2,6 +2,7 @@ use solid::filter::firdes;
 use solid::filter::fir_filter::{FIRFilter, float_filter::Filter};
 use solid::filter::auto_correlator::AutoCorrelator;
 use solid::auto_gain_control::AGC;
+use solid::nco::NCO;
 
 use std::error::Error;
 
@@ -67,19 +68,29 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 
     let mut auto_corr = AutoCorrelator::<f64>::new(10, 5);
-    let auto_corr_output = auto_corr.execute_block(&filter_output);
-    for num in auto_corr_output.iter() {
+    let _auto_corr_output = auto_corr.execute_block(&filter_output);
+
+
+    let mut nco = NCO::new();
+    nco.set_frequency(0.00000001);
+    let mut nco_output = Vec::new();
+    for _ in 0..1024 {
+        let (r, i) = nco.sincos();
+        nco_output.push(Complex::new(r, i));
+        nco.step();
+    }
+
+    for num in nco_output.iter() {
         real.push(num.re);
         imag.push(num.im);
     }
 
-    // for index in 0..10 {
-    //     println!("{}", auto_corr_output[index]);
-    // }
 
-    println!("{}", filter);
+    for index in 0..10 {
+        println!("{}", nco_output[index]);
+    }
 
-    plot(&real, &imag, auto_corr_output.len())?;
+    plot(&real, &imag, nco_output.len())?;
 
     Ok(())
 }

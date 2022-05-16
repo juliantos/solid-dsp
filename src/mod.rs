@@ -4,6 +4,7 @@ pub mod dot_product;
 pub mod filter;
 pub mod group_delay;
 pub mod math;
+pub mod nco;
 pub mod resources;
 pub mod window;
 pub mod windows;
