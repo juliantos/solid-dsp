@@ -14,10 +14,10 @@ fn delay_test() {
 
     for i in 0..hlen {
         let t = i as f32 - m as f32;
-        h[i] = (fc * t).sin() * hamming_f32(i, hlen);
+        h[i] = (fc * t).sin() * hamming(i, hlen);
     }
 
     let dt: f32 = -2.0;
     
-    let dt_actual = fir_group_delay_f32(&h, dt);
+    let dt_actual = fir_group_delay(&h, dt);
 }

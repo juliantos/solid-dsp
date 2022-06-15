@@ -11,7 +11,6 @@ use std::error::Error;
 use std::fmt;
 
 use std::f64::consts::PI as PI_64;
-use std::f32::consts::PI as PI_32;
 
 use num::complex::Complex;
 
@@ -269,53 +268,6 @@ pub fn firdes_kaiser(filter_length: usize, cutoff_frequency: f64, stop_band_atte
     Ok(h)
 }
 
-/// Design FIR Filter Coefficients using Kaiser Window
-///
-/// Creates a [`Vec<f32>`] of coefficients using the specified inputs.
-/// 
-/// # Arguments
-/// 
-/// * `filter_length` - size of the filter in taps
-/// * `cutoff_frequency` - bandwidth of the frequency to remain from (0, 0.5)
-/// * `stop_band_attenuation` - supression in dB (0, inf)
-/// * `fraction_sample_offset` - fractional sample offset (-0.5, 0.5)
-/// 
-/// # Example 
-/// 
-/// ```
-/// use solid::filter::firdes;
-/// 
-/// let taps = match firdes::firdes_kaiser_f32(8, 0.35, 120.0, 0.0) {
-///     Ok(taps) => taps,
-///     _ => vec!()
-/// };
-/// 
-/// assert_eq!(taps.len(), 8);
-/// ```
-pub fn firdes_kaiser_f32(filter_length: usize, cutoff_frequency: f32, stop_band_attenuation: f32, fractional_sample_offset: f32) -> Result<Vec<f32>, Box<dyn Error>> {
-    if fractional_sample_offset < -0.5 || fractional_sample_offset > 0.5 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidMu)))
-    } else if cutoff_frequency > 0.5 || cutoff_frequency < 0.0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidBandwidth)))
-    } else if stop_band_attenuation <= 0.0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidStopBandLevel)))
-    }
-
-    let beta = kaiser_beta(stop_band_attenuation as f64) as f32;
-    let mut h: Vec<f32> = vec![0.0; filter_length];
-    for i in 0..filter_length {
-        let t = i as f32 - ((filter_length - 1) as f32) / 2.0 + fractional_sample_offset;
-        
-        let h1 = (2.0 * cutoff_frequency * t).sinc();
-
-        let h2 = kaiser::kaiser_f32(i, filter_length, beta)?;
-
-        h[i] = h1 * h2;
-    }
-
-    Ok(h)
-}
-
 /// Design FIR Filter Coefficients based on the notch filter (Band-Stop)
 ///
 /// Creates a [`Vec<f64>`] of coefficients using the specified inputs.
@@ -371,61 +323,6 @@ pub fn firdes_notch(semi_length: usize, notch_frequency: f64, stop_band_attenuat
     Ok(h)
 }
 
-/// Design FIR Filter Coefficients based on the notch filter (Band-Stop)
-///
-/// Creates a [`Vec<f32>`] of coefficients using the specified inputs.
-/// 
-/// # Arguments
-/// 
-/// * `semi_length` - half size of the filter in taps
-/// * `notch_frequency` - the filter normalized notch frequency (-0.5, 0.5)
-/// * `stop_band_attenuation` - supression in dB (0, inf)
-/// 
-/// # Example 
-/// 
-/// ```
-/// use solid::filter::firdes;
-/// 
-/// let taps = match firdes::firdes_notch_f32(8, 0.35, 120.0) {
-///     Ok(taps) => taps,
-///     _ => vec!()
-/// };
-/// 
-/// assert_eq!(taps.len(), 17);
-/// ```
-pub fn firdes_notch_f32(semi_length: usize, notch_frequency: f32, stop_band_attenuation: f32) -> Result<Vec<f32>, Box<dyn Error>> {
-    if semi_length < 1 || semi_length > 1000 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidSemiLength)))
-    } else if notch_frequency > 0.5 || notch_frequency < 0.0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidBandwidth)))
-    } else if stop_band_attenuation <= 0.0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidStopBandLevel)))
-    }
-
-    let beta = kaiser_beta(stop_band_attenuation as f64) as f32;
-    let h_len = 2 * semi_length + 1;
-
-    let mut h = vec![0.0; h_len];
-    let mut scale = 0.0;
-
-    for i in 0..h_len {
-        let tone = -(2.0 * PI_32 * notch_frequency * (i as f32 - semi_length as f32)).cos();
-        let window = kaiser::kaiser_f32(i, h_len, beta)?;
-        h[i] = tone * window;
-        scale += h[i] * tone;
-    }
-
-    // normalize
-    for coef in h.iter_mut() {
-        *coef /= scale;
-    }
-
-    // impulse
-    h[semi_length] += 1.0;
-
-    Ok(h)
-}
-
 /// Design FIR Filter Coefficients based on the doppler filter
 ///
 /// Creates a [`Vec<f64>`] of coefficients using the specified inputs.
@@ -466,54 +363,6 @@ pub fn firdes_doppler(filter_length: usize, doppler_frequency: f64, rice_fading_
 
         // Window
         let w = kaiser::kaiser(i, filter_length, beta)?;
-
-        // Composite
-        h[i] = (j + r) * w;
-    }
-
-    Ok(h)
-}
-
-/// Design FIR Filter Coefficients based on the doppler filter
-///
-/// Creates a [`Vec<f32>`] of coefficients using the specified inputs.
-/// 
-/// # Arguments
-/// 
-/// * `filter_length` - size of the filter in taps
-/// * `doppler_frequency` - the filter normalized doppler frequency (0, 0.5)
-/// * `rice_fading_factor` - `K` in dB (0, inf)
-/// * `theta` - LoS component angle of arrival
-/// 
-/// # Example 
-/// 
-/// ```
-/// use solid::filter::firdes;
-/// 
-/// let taps = match firdes::firdes_doppler_f32(51, 0.1, 2.0, 0.0) {
-///     Ok(taps) => taps,
-///     _ => vec!()
-/// };
-/// 
-/// assert_eq!(taps.len(), 51);
-/// ```
-pub fn firdes_doppler_f32(filter_length: usize, doppler_frequency: f32, rice_fading_factor: f32, theta: f32) -> Result<Vec<f32>, Box<dyn Error>> {
-    let beta = 4.0;
-
-    let mut h = vec![0.0; filter_length];
-
-    for i in 0..filter_length {
-        // Time sample
-        let t = i as f32 - (filter_length as f32 - 1.0) / 2.0;
-
-        // Bessel
-        let j = 1.5 * (2.0 * PI_32 * doppler_frequency * t).abs().besselj(0.0);
-
-        // Rice-K component
-        let r = 1.5 * rice_fading_factor / ( rice_fading_factor + 1.0) * (2.0 * PI_32 * doppler_frequency * t * theta.cos()).cos();
-
-        // Window
-        let w = kaiser::kaiser_f32(i, filter_length, beta)?;
 
         // Composite
         h[i] = (j + r) * w;
@@ -712,7 +561,7 @@ pub fn filter_energy(filter: &[f64], cutoff_frequency: f64, fft_size: usize) -> 
     let mut e_total = 0.0;
     let mut e_stopband = 0.0;
 
-    let dp = DotProduct::<f64>::new(filter.to_vec(), Direction::FORWARD);
+    let dp = DotProduct::<f64>::new(filter, Direction::FORWARD);
 
     for i in 0..fft_size {
         let f = 0.5 * i as f64 / fft_size as f64;

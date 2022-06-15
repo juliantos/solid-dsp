@@ -19,37 +19,11 @@ use std::error::Error;
 /// let window_len = 25;
 /// let mut h = vec![0.0; 25];
 /// for i in 0..window_len {
-///     h[i] = match hamming::hamming_f32(i, window_len) {
-///         Ok(val) => val,
-///         _ => 0.0
-///     };
-/// }
-/// 
-/// ```
-pub fn hamming_f32(index: usize, window_length: usize) -> Result<f32, Box<dyn Error>> {
-    if index > window_length {
-        return Err(Box::new(WindowError(WindowErrorCode::OutOfBounds)));
-    }
-
-    Ok(0.53836 - 0.46164 * ((2.0 * std::f32::consts::PI * index as f32) / ((window_length - 1) as f32)).cos())
-}
-
-/// Function to calculate the value of the tap at `index` of `window_length`
-/// 
-/// Uses the Hamming formula to generate taps in the window
-/// 
-/// # Example
-/// 
-/// ```
-/// use solid::windows::hamming;
-/// 
-/// let window_len = 25;
-/// let mut h = vec![0.0; 25];
-/// for i in 0..window_len {
 ///     h[i] = match hamming::hamming(i, window_len) {
 ///         Ok(val) => val,
 ///         _ => 0.0
 ///     };
+///     assert_ne!(h[i], 0.0);
 /// }
 /// 
 /// ```

@@ -1,9 +1,10 @@
 use super::DotProduct;
 
 use std::iter::Sum;
+use std::ops::Mul;
 
 use num::complex::Complex;
-use num_traits::float::Float;
+use num_traits::Num;
 
 pub trait Execute<T> {
     type Output;
@@ -17,7 +18,7 @@ pub trait Execute<T> {
     /// use solid::dot_product::{DotProduct, Direction, execute::Execute};
     /// 
     /// let coefs = [1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let dp = DotProduct::new(coefs.to_vec(), Direction::REVERSE);
+    /// let dp = DotProduct::new(&coefs, Direction::REVERSE);
     /// let mul = vec![1.0; 5];
     /// let exe = Execute::execute(&dp, &mul);
     /// 
@@ -26,7 +27,7 @@ pub trait Execute<T> {
     fn execute(&self, samples: &[T]) -> Self::Output;
 }
 
-impl<T: Float + Sum> Execute<T> for DotProduct<T> {
+impl<T: Copy + Mul + Sum<<T as Mul>::Output>> Execute<T> for DotProduct<T> {
     type Output = T;
 
     #[inline]
@@ -36,18 +37,17 @@ impl<T: Float + Sum> Execute<T> for DotProduct<T> {
     }
 }
 
-impl<T: Float + Sum> Execute<Complex<T>> for DotProduct<T> {
+impl<T: Copy + Num> Execute<Complex<T>> for DotProduct<T> {
     type Output = Complex<T>;
 
     #[inline]
     fn execute(&self, samples: &[Complex<T>]) -> Self::Output {
-        let product_real = self.coef.iter().zip(samples.iter()).map(|(&x, &y)| x * y.re).sum();
-        let product_imag = self.coef.iter().zip(samples.iter()).map(|(&x, &y)| x * y.im).sum();
-        Complex::new(product_real, product_imag)
+        let product: Self::Output = samples.iter().zip(self.coef.iter()).map(|(&x, &y)| x * y).sum();
+        product
     }
 }
 
-impl<T: Float> Execute<T> for DotProduct<Complex<T>> {
+impl<T: Copy + Num> Execute<T> for DotProduct<Complex<T>> {
     type Output = Complex<T>;
 
     #[inline]

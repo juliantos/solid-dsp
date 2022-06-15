@@ -97,7 +97,7 @@ impl NCO {
 
     #[inline]
     fn index(&self) -> usize {
-        (((self.theta + 1 << 21) >> 22) & 0x3ff) as usize
+        (((self.theta + (1 << 21)) >> 22) & 0x3ff) as usize
     }
 
     #[inline]

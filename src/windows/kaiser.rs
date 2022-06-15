@@ -22,44 +22,11 @@ use std::error::Error;
 /// let window_len = 25;
 /// let mut h = vec![0.0; 25];
 /// for i in 0..window_len {
-///     h[i] = match kaiser::kaiser_f32(i, window_len, 8.6) {
-///         Ok(val) => val,
-///         _ => 0.0
-///     };
-/// }
-/// 
-/// ```
-pub fn kaiser_f32(index: usize, window_length: usize, beta: f32) -> Result<f32, Box<dyn Error>> {
-    if index > window_length {
-        return Err(Box::new(WindowError(WindowErrorCode::OutOfBounds)));
-    } else if beta < 0.0 {
-        return Err(Box::new(WindowError(WindowErrorCode::BetaLessThanZero)))
-    }
-
-    let t = index as f32 - (window_length - 1) as f32 / 2.0;
-    let r = 2.0 * t / ((window_length - 1) as f32);
-    let a = (beta * (1.0 - r * r).sqrt()).besseli(0.0);
-    let b = beta.besseli(0.0);
-
-    Ok(a / b)
-}
-
-/// Function to calculate the value of the tap at `index` of `window_length`
-/// 
-/// Uses the Kaiser formula to generate taps in the window
-/// 
-/// # Example
-/// 
-/// ```
-/// use solid::windows::kaiser;
-/// 
-/// let window_len = 25;
-/// let mut h = vec![0.0; 25];
-/// for i in 0..window_len {
 ///     h[i] = match kaiser::kaiser(i, window_len, 8.6) {
 ///         Ok(val) => val,
 ///         _ => 0.0
 ///     };
+///     assert_ne!(h[i], 0.0);
 /// }
 /// 
 /// ```

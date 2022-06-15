@@ -3,6 +3,9 @@ pub mod complex;
 use std::f64::consts::PI as PI_64;
 use std::f32::consts::PI as PI_32;
 
+static BESSEL_ITERATIONS: usize = 64;
+static BESSEL_J_ITERATIONS: usize = 128;
+
 pub trait Sinc<T> {
     /// Computes  sinc(x) = sin(pi/x) / (pi/x)
     fn sinc(&self) -> T;
@@ -88,9 +91,7 @@ impl Bessel<f64> for f64 {
         let t0 = nu * (0.5 * self).ln();
         let mut y = 0.0;
 
-        // 64 is the number of BESSEL Iterations
-        // FIXME: should be configurable by compiler
-        for k in 0..64 {
+        for k in 0..BESSEL_ITERATIONS {
             // compute log( (z^2/4)^k )
             let t1 = 2.0 * k as f64 * (0.5 * self).ln();
             // compute: log( k! * Gamma(nu + k +1) )
@@ -122,8 +123,7 @@ impl Bessel<f64> for f64 {
 
         let abs_nu = nu.abs();
 
-        // FIXME: Bessel J Iterations
-        for i in 0..128 {
+        for i in 0..BESSEL_J_ITERATIONS {
             // compute: (2i + |nu|)
             let t0 = 2.0 * i as f64 + abs_nu;
 
@@ -199,9 +199,7 @@ impl Bessel<f32> for f32 {
         let t0 = nu * (0.5 * self).ln();
         let mut y = 0.0;
 
-        // 64 is the number of BESSEL Iterations
-        // FIXME: should be configurable by compiler
-        for k in 0..64 {
+        for k in 0..BESSEL_ITERATIONS {
             // compute log( (z^2/4)^k )
             let t1 = 2.0 * k as f32 * (0.5 * self).ln();
             // compute: log( k! * Gamma(nu + k +1) )
@@ -233,8 +231,7 @@ impl Bessel<f32> for f32 {
 
         let abs_nu = nu.abs();
 
-        // FIXME: Bessel J Iterations
-        for i in 0..128 {
+        for i in 0..BESSEL_J_ITERATIONS {
             // compute: (2i + |nu|)
             let t0 = 2.0 * i as f32 + abs_nu;
 

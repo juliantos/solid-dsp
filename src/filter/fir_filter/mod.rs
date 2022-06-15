@@ -26,7 +26,7 @@ use std::fmt;
 use std::iter::Sum;
 
 use num::complex::Complex;
-use num_traits::{Num, Float};
+use num_traits::Num;
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -37,7 +37,7 @@ pub struct FIRFilter<C> {
     dot_product: DotProduct<C>
 }
 
-impl<C: Clone + Float + Sum + Num> FIRFilter<C> {
+impl<C: Copy + Num + Sum> FIRFilter<C> {
     /// Constructs a new, `FIRFilter<C>`
     /// 
     /// Uses the input which represents the discrete coeficients of type `C` 
@@ -47,15 +47,15 @@ impl<C: Clone + Float + Sum + Num> FIRFilter<C> {
     /// 
     /// ```
     /// use solid::filter::fir_filter::FIRFilter;
-    /// let coefficients: [f32; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let filter = FIRFilter::<f32>::new(&coefficients, 1.0);
+    /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let filter = FIRFilter::<f64>::new(&coefficients, 1.0);
     /// ```
     pub fn new(coefficents: &[C], scale: C) -> Self {
         FIRFilter {
             coefs: coefficents.to_vec(),
             scale: scale,
             window: Window::new(1 << msb_index(coefficents.len()), 0),
-            dot_product: DotProduct::new(coefficents.to_vec(), Direction::REVERSE)
+            dot_product: DotProduct::new(coefficents, Direction::REVERSE)
         }
     }
 
@@ -67,8 +67,8 @@ impl<C: Clone + Float + Sum + Num> FIRFilter<C> {
     /// 
     /// ```
     /// use solid::filter::fir_filter::FIRFilter;
-    /// let coefficients: [f32; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let mut filter = FIRFilter::<f32>::new(&coefficients, 1.0);
+    /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let mut filter = FIRFilter::<f64>::new(&coefficients, 1.0);
     /// filter.set_scale(2.0);
     /// 
     /// assert_eq!(filter.get_scale(), 2.0);
@@ -86,8 +86,8 @@ impl<C: Clone + Float + Sum + Num> FIRFilter<C> {
     /// 
     /// ```
     /// use solid::filter::fir_filter::FIRFilter;
-    /// let coefficients: [f32; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let filter = FIRFilter::<f32>::new(&coefficients, 1.0);
+    /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let filter = FIRFilter::<f64>::new(&coefficients, 1.0);
     /// assert_eq!(filter.get_scale(), 1.0);
     /// ```
     #[inline(always)]
@@ -103,8 +103,8 @@ impl<C: Clone + Float + Sum + Num> FIRFilter<C> {
     /// use solid::filter::fir_filter::FIRFilter;
     /// use num::Complex;
     /// 
-    /// let coefficients: [f32; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let mut filter = FIRFilter::<f32>::new(&coefficients, 1.0);
+    /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let mut filter = FIRFilter::<f64>::new(&coefficients, 1.0);
     /// filter.push(Complex::new(4.0, 0.0));
     /// ```
     #[inline(always)]
@@ -120,8 +120,8 @@ impl<C: Clone + Float + Sum + Num> FIRFilter<C> {
     /// use solid::filter::fir_filter::FIRFilter;
     /// use num::Complex;
     /// 
-    /// let coefficients: [f32; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let mut filter = FIRFilter::<f32>::new(&coefficients, 1.0);
+    /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let mut filter = FIRFilter::<f64>::new(&coefficients, 1.0);
     /// let window = [Complex::new(2.02, 0.0), Complex::new(4.04, 0.0)];
     /// filter.write(&window);
     /// ```
@@ -141,8 +141,8 @@ impl<C: Clone + Float + Sum + Num> FIRFilter<C> {
     /// use solid::filter::fir_filter::FIRFilter;
     /// use num::Complex;
     /// 
-    /// let coefficients: [f32; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let mut filter = FIRFilter::<f32>::new(&coefficients, 1.0);
+    /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let mut filter = FIRFilter::<f64>::new(&coefficients, 1.0);
     /// let window = [Complex::new(2.02, 0.0), Complex::new(4.04, 0.0), Complex::new(1.02, 0.0),
     ///     Complex::new(0.23, 0.0), Complex::new(9.19, 0.0)];
     /// filter.write(&window);
@@ -167,15 +167,15 @@ impl<C: Clone + Float + Sum + Num> FIRFilter<C> {
     /// use solid::filter::fir_filter::FIRFilter;
     /// use num::Complex;
     /// 
-    /// let coefficients: [f32; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let mut filter = FIRFilter::<f32>::new(&coefficients, 1.0);
+    /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let mut filter = FIRFilter::<f64>::new(&coefficients, 1.0);
     /// let window = [Complex::new(2.02, 0.0), Complex::new(4.04, 0.0), 
     ///     Complex::new(1.02, 0.0), Complex::new(0.23, 0.0)];
     /// filter.write(&window);
     /// let output = filter.execute_block(&vec![Complex::new(9.19, 0.0), Complex::new(1.2, 0.0), 
     ///         Complex::new(3.02, 0.0), Complex::new(0.3, 0.0), Complex::new(90.0, 0.0)]);
     /// 
-    /// assert_eq!(output[0], Complex::new(60.029995, 0.0));
+    /// assert_eq!(output[0], Complex::new(60.03, 0.0));
     /// ```
     #[inline(always)]
     pub fn execute_block(&mut self, samples: &[Complex<C>]) -> Vec<Complex<C>> {
@@ -221,9 +221,6 @@ impl<C: Clone + Float + Sum + Num> FIRFilter<C> {
         &self.coefs
     }
 }
-
-pub type FirFilter32 = FIRFilter<f32>;
-pub type FirFilter64 = FIRFilter<f64>;
 
 impl<C: Clone + fmt::Debug + fmt::Display + Copy> fmt::Display for FIRFilter<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
