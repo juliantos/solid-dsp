@@ -87,19 +87,9 @@ impl<T: Clone> Clone for Window<T> where T: Copy {
     }
 }
 
-impl<T: fmt::Display + std::string::ToString> fmt::Display for Window<T> {
+impl<T: fmt::Display> fmt::Display for Window<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut values: String = "".to_string();
-        for i in 0..self.capacity {
-            let value = unsafe {
-                let buf_ptr = self.buffer.offset((self.delay + i) as isize);
-                ptr::read(buf_ptr)
-            };
-            values += &value.to_string();
-            if i != self.capacity - 1 {
-                values += ", "
-            }
-        }
-        write!(f, "[{}]", values)
+        let typename = std::any::type_name::<T>();
+        write!(f, "Window<{}> [Capacity={}] [Delay={}]", typename, self.capacity, self.delay)
     }
 }

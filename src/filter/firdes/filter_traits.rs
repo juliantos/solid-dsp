@@ -10,7 +10,7 @@ pub trait Firdes {
     fn energy(&self, fc: Self::Output, fft_size: usize) -> Self::Output;
 }
 
-impl Firdes for FIRFilter<f64> {
+impl<T: Copy> Firdes for FIRFilter<f64, T> {
     type Output = f64;
 
     fn autocorrelation(&self, lag: isize) -> Self::Output {

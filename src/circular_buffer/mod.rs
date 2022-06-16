@@ -93,6 +93,50 @@ impl<T> CircularBuffer<T> {
         }
     }
 
+    /// Constructs a new, non-empty `CircularBuffer<T>` 
+    /// 
+    /// The Buffer Allocates before any element is pushed on it
+    /// 
+    /// Creates a Circular Buffer of the type `T` and allocates 
+    /// n amount of elements. These values are initialized to the 
+    /// contents of the vector
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// let x = vec![0, 1, 2, 3, 4, 5, 6, 7];
+    /// let mut buffer = solid::circular_buffer::CircularBuffer::from_vec(x);
+    /// 
+    /// assert_eq!(buffer.len(), 8);
+    /// ```
+    pub fn from_vec(vec: Vec<T>) -> Self {
+        let mut temp = CircularBuffer::new(vec.len() as isize);
+        temp.write(vec.as_ptr(), vec.len()).unwrap_or_default();
+        temp
+    }
+
+    /// Constructs a new, non-empty `CircularBuffer<T>` 
+    /// 
+    /// The Buffer Allocates before any element is pushed on it
+    /// 
+    /// Creates a Circular Buffer of the type `T` and allocates 
+    /// n amount of elements. These values are initialized to the 
+    /// contents of the slice
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// let x = [0, 1, 2, 3, 4, 5, 6, 7];
+    /// let mut buffer = solid::circular_buffer::CircularBuffer::from_slice(&x);
+    /// 
+    /// assert_eq!(buffer.len(), 8);
+    /// ```
+    pub fn from_slice(slice: &[T]) -> Self {
+        let mut temp = CircularBuffer::new(slice.len() as isize);
+        temp.write(slice.as_ptr(), slice.len()).unwrap_or_default();
+        temp
+    }
+
     /// Returns a raw pointer to the start of the buffer
     /// 
     /// This function also re-linearizes the data so that the data
@@ -470,6 +514,7 @@ impl<T: fmt::Display + std::string::ToString> fmt::Display for CircularBuffer<T>
                 values += ", "
             }
         }
-        write!(f, "[{}]", values)
+        let typename = std::any::type_name::<T>();
+        write!(f, "CircularBuffer<{}> [{}]", typename, values)
     }
 }

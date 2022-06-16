@@ -17,7 +17,7 @@
 pub mod execute;
 
 use std::fmt;
-use std::ops::Mul;
+use std::ops::{Mul, Index};
 use std::iter::Sum;
 
 pub enum Direction {
@@ -75,10 +75,53 @@ impl<T: Copy + Mul<T, Output=T> + Sum> DotProduct<T> {
         product
     }
 
+    /// Gets a reference to the coefficients
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use solid::dot_product::{DotProduct, Direction};
+    /// 
+    /// let coefs = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let dp = DotProduct::new(&coefs, Direction::FORWARD);
+    /// let ref_coefs = dp.coefficents();
+    /// 
+    /// assert_eq!(coefs, *ref_coefs);
+    /// ```
+    pub fn coefficents(&self) -> &Vec<T> {
+        &self.coef
+    }
+
+    /// Gets the length of the coefficients
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use solid::dot_product::{DotProduct, Direction};
+    /// 
+    /// let coefs = [1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let dp = DotProduct::new(&coefs, Direction::REVERSE);
+    /// 
+    /// assert_eq!(dp.len(), 5);
+    /// ```
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        self.coef.len()
+    }
 }
 
-impl<T: fmt::Debug> fmt::Display for DotProduct<T> {
+impl<T: fmt::Display> fmt::Display for DotProduct<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self.coef)
+        let typename = std::any::type_name::<T>();
+        write!(f, "DotProduct<{}> [Size={}]", typename, self.coef.len())
+
+    }
+}
+
+impl<T> Index<usize> for DotProduct<T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.coef[index]
     }
 }

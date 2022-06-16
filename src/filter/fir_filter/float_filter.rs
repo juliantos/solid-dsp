@@ -20,7 +20,7 @@ pub trait Filter {
     ///     Ok(coefs) => coefs,
     ///     _ => vec!()
     /// };
-    /// let filter = FIRFilter::new(&coefs, 1.0);
+    /// let filter = FIRFilter::<f64, f64>::new(&coefs, 1.0);
     /// let response = Filter::frequency_response(&filter, 0.0);
     /// 
     /// assert_eq!(response.re.round(), 1.0);
@@ -40,7 +40,7 @@ pub trait Filter {
     ///     Ok(coefs) => coefs,
     ///     _ => vec!()
     /// };
-    /// let filter = FIRFilter::new(&coefs, 1.0);
+    /// let filter = FIRFilter::<f64, f64>::new(&coefs, 1.0);
     /// let delay = Filter::group_delay(&filter, 0.0);
     /// 
     /// assert_eq!((delay + 0.5) as usize, 12);
@@ -48,7 +48,8 @@ pub trait Filter {
     fn group_delay(&self, frequency: Self::Float) -> Self::Float;
 }
 
-impl Filter for FIRFilter<f64> {
+// FIXME[epic=Dumbshit]
+impl<T> Filter for FIRFilter<f64, T> {
     type Float = f64;
     type Complex = Complex<f64>;
 
@@ -63,7 +64,7 @@ impl Filter for FIRFilter<f64> {
     }
 
     fn group_delay(&self, frequency: Self::Float) -> Self::Float {
-        match fir_group_delay(&self.coefs, frequency) {
+        match fir_group_delay(&self.coefs.coefficents(), frequency) {
             Ok(delay) => delay,
             Err(e) => {
                 if cfg!(debug_assertions) {

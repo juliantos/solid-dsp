@@ -186,3 +186,8 @@ pub fn constrain(theta: f64) -> u32 {
     (fractional_part * 0xffffffffu32 as f64) as u32
 }
 
+impl fmt::Display for NCO {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "NCO [Theta={}] [ΔTheta={}] [Alpha={}] [Beta={}]", self.theta, self.delta_theta, self.alpha, self.beta)
+    }
+}

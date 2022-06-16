@@ -616,3 +616,10 @@ impl AGC {
         };
     }
 }
+
+impl fmt::Display for AGC {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "AGC [Gain={:.5}] [Scale={:.5}] [Bandwidth={:.5}] [Alpha={:.5}] [Energy={:.5}]", 
+            self.gain, self.scale, self.bandwidth, self.alpha, self.energy_estimate)
+    }
+}

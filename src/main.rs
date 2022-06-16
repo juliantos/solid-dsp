@@ -1,6 +1,7 @@
 use solid::filter::firdes;
 use solid::filter::fir_filter::{FIRFilter, float_filter::Filter};
 use solid::filter::auto_correlator::AutoCorrelator;
+use solid::circular_buffer::CircularBuffer;
 use solid::auto_gain_control::AGC;
 use solid::nco::NCO;
 use solid::fft::{FFT, FFTDirection, FFTFlags};
@@ -48,21 +49,33 @@ fn plot(real: &[f64], imag: &[f64], len: usize, height: f32) -> Result<(), Box<d
 
 fn main() -> Result<(), Box<dyn Error>> {
     let coefs = firdes::firdes_notch(25, 0.2, 30.0)?;
+    let complex_coefs: Vec<Complex<f64>> = coefs.iter().map(|&x| Complex::new(x, 0.0)).collect();
     let mut filter = FIRFilter::new(&coefs, 1.0);
+    let mut complex_filter = FIRFilter::<Complex<f64>, f64>::new(&complex_coefs, Complex::new(1.0, 1.0));
 
     let len = 500;
     let ivec: Vec<f64> = (-len/2..len/2).map(|x| (x as f64).cos() * 0.125).collect();
     let qvec: Vec<f64> = (-len/2..len/2).map(|x| (x as f64).sin() * 0.125).collect();
     let complex_vec : Vec<Complex<f64>> = ivec.iter().zip(qvec.iter()).map(|(&x, &y)| Complex::new(x, y)).collect();
 
+    let _circular_buffer = CircularBuffer::from_slice(&complex_vec);
+    // println!("{}", circular_buffer);
+
     let mut agc = AGC::new();
+    println!("{}", agc);
     agc.squelch_enable();
     agc.set_bandwidth(0.01)?;
     agc.squelch_set_threshold(-22.0);
     let agc_vec = agc.execute_block(&complex_vec);
     
     let filter_output = filter.execute_block(&agc_vec);
+    let _complex_filter_output = complex_filter.execute_block(&ivec);
     let _filter_delay = Filter::group_delay(&filter, 0.125);
+
+    println!("{:?}", _complex_filter_output);
+
+    println!("{}", filter);
+    println!("{}", complex_filter);
 
     let mut real = vec![];
     let mut imag = vec![];
@@ -71,6 +84,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut auto_corr = AutoCorrelator::<f64>::new(10, 5);
     let _auto_corr_output = auto_corr.execute_block(&filter_output);
 
+    println!("{}", auto_corr);
 
     let mut nco = NCO::new();
     nco.set_frequency(0.1);
@@ -81,14 +95,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         nco.step();
     }
 
+    println!("{}", nco);
+
     let fft_size = 129 * 7;
     let fftf = FFT::new(fft_size, FFTDirection::FORWARD, FFTFlags::ESTIMATE);
     let fftr = FFT::new(fft_size, FFTDirection::REVERSE, FFTFlags::ESTIMATE);
     let fft_output = fftf.execute(&nco_output)?;
     let second_fft_output = fftr.execute(&fft_output)?;
 
-    println!("{:#?}", &fft_output[0..fft_size]);
-    println!("{:#?}", &second_fft_output[0..fft_size]);
+    println!("{}", fftf);
+    println!("{}", fftr);
 
     for num in fft_output.iter() {
         real.push(num.re);

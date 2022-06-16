@@ -13,12 +13,13 @@
 use super::super::math::complex::{Real};
 use super::super::window::Window;
 
-// use std::fmt;
+use std::fmt;
 use std::error::Error;
+use std::ops::Neg;
 use std::iter::Sum;
 
 use num::complex::Complex;
-use num_traits::{Num, Float};
+use num_traits::Num;
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -33,7 +34,7 @@ pub struct AutoCorrelator<C> {
     energy_index: usize
 }
 
-impl<C: Clone + Float + Sum + Num> AutoCorrelator<C> {
+impl<C: Copy + Sum + Num + Neg<Output=C>> AutoCorrelator<C> {
     /// Constructs a new, `AutoCorrelator<C>`
     /// 
     /// Creates an auto correlator filter of `window_size` and `delay` Also takes the primitive `C` 
@@ -199,5 +200,12 @@ impl<C: Clone + Float + Sum + Num> AutoCorrelator<C> {
     /// ```
     pub fn get_energy(&self) -> f64 {
         self.energy_sum
+    }
+}
+
+impl<C> fmt::Display for AutoCorrelator<C> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let typename = std::any::type_name::<C>();
+        write!(f, "AutoCorrelator<{}> [Size={}] [Delay={}] [Energy={}]", typename, self.window_size, self.delay, self.energy_sum)
     }
 }
