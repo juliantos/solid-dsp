@@ -1,5 +1,6 @@
 use solid::filter::firdes;
 use solid::filter::fir_filter::{FIRFilter, float_filter::Filter};
+use solid::filter::iir_filter::{IIRFilter, IIRFilterType};
 use solid::filter::auto_correlator::AutoCorrelator;
 use solid::circular_buffer::CircularBuffer;
 use solid::auto_gain_control::AGC;
@@ -110,6 +111,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         real.push(num.re);
         imag.push(num.im);
     }
+
+    let dumb_pll_ff = [6039.61035, 4000.0, -2039.61035];
+    let dumb_pll_fb = [4082.63281, -8163.26562, 4080.63281];
+    let mut iir_filter = IIRFilter::new(&dumb_pll_ff, &dumb_pll_fb, IIRFilterType::SecondOrder)?;
+    let mut value = Complex::new(0.0, 0.0);
+    for i in 0..20 {
+        value = iir_filter.execute(second_fft_output[i]);
+    }
+
+    println!("{} {}", value, second_fft_output[19]);
+
     plot(&real, &imag, second_fft_output.len(), fft_size as f32)?;
 
     Ok(())

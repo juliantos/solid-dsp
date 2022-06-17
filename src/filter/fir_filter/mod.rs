@@ -52,6 +52,7 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
     /// let filter = FIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0);
     /// ```
     pub fn new(coefficents: &[C], scale: C) -> Self {
+        // FIXME[epic=Error] Add error if size of coeffs is 0
         FIRFilter {
             scale: scale,
             window: Window::new(1 << msb_index(coefficents.len()), 0),
