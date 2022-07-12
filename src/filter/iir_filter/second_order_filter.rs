@@ -10,7 +10,7 @@ use std::ops::Sub;
 
 use either::Either;
 
-use num_traits::{Num, Float};
+use num_traits::Num;
 
 #[derive(Debug)]
 pub enum SecondOrderErrorCode {
@@ -28,14 +28,13 @@ impl fmt::Display for SecondOrderError {
 
 impl Error for SecondOrderError {}
 
-pub struct SecondOrder<C, T> {
+pub struct SecondOrderFilter<C, T> {
     form_buffer_ii: Window<T>,
     numerator_coefs: DotProduct<C>,
     denominator_coefs: DotProduct<C>
 }
 
-// FIXME[epic=Dumbshit] Group Delay and Freq Response
-impl<C: Copy + Num + Sum, T: Copy> SecondOrder<C, T> {
+impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
     pub fn new(feed_forward: &[C], feed_back: &[C]) -> Result<Self, Box<dyn Error>> {
         if feed_forward.len() < 3 {
             return Err(Box::new(SecondOrderError(SecondOrderErrorCode::CoefficientsNotInRange)));
@@ -47,7 +46,7 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrder<C, T> {
         let b = [feed_forward[0] / a0, feed_forward[1] / a0, feed_forward[2] / a0];
         let a = [feed_back[0] / a0, feed_back[1] / a0, feed_back[2] / a0];
 
-        Ok(SecondOrder {
+        Ok(SecondOrderFilter {
             form_buffer_ii: Window::new(3, 0),
             numerator_coefs: DotProduct::new(&a[1..], Direction::FORWARD),
             denominator_coefs: DotProduct::new(&b, Direction::FORWARD)
@@ -78,6 +77,14 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrder<C, T> {
         let numer_output = Execute::execute(&self.denominator_coefs, &buffer);
         numer_output
     }
-}
+    
+    #[inline(always)]
+    pub fn numerator_coefs(&self) -> &Vec<C> {
+        self.numerator_coefs.coefficents()
+    }
 
-Filter
+    #[inline(always)]
+    pub fn denominator_coefs(&self) -> &Vec<C> {
+        self.denominator_coefs.coefficents()
+    }
+}

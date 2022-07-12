@@ -203,7 +203,7 @@ impl AGC {
     /// assert_eq!(agc_samp_out, complex_vec[0]);
     /// assert!(second_samp != complex_vec[1]);
     /// ```
-    pub fn execute<T: Mul<f64, Output=T> + Mul<T, Output=T> + Conj + Real<Output=f64> + Copy>(&mut self, input: T) -> T {
+    pub fn execute<T: Mul<f64, Output=T> + Mul<T, Output=T> + Conj<Output=T> + Real<Output=f64> + Copy>(&mut self, input: T) -> T {
         // First get the output
         let out: T = input * self.gain;
 
@@ -253,7 +253,7 @@ impl AGC {
     /// assert_eq!(agc_vec[0], complex_vec[0]);
     /// ```
     #[inline]
-    pub fn execute_block<T: Mul<f64, Output=T> + Mul<T, Output=T> + Conj + Real<Output=f64> + Copy>(&mut self, input: &[T]) -> Vec<T> {
+    pub fn execute_block<T: Mul<f64, Output=T> + Mul<T, Output=T> + Conj<Output=T> + Real<Output=f64> + Copy>(&mut self, input: &[T]) -> Vec<T> {
         let mut out: Vec<T> = vec!();
         for &i in input.iter() {
             out.push(self.execute(i));
@@ -538,7 +538,7 @@ impl AGC {
     /// 
     /// assert!(signal_level > 0.04999 && signal_level <= 0.05);
     /// ```
-    pub fn init<T: Mul<f64, Output=T> + Mul<T, Output=T> + Conj + Real<Output=f64> + Copy>(&mut self, input: &[T]) -> Result<f64, Box<dyn Error>> {
+    pub fn init<T: Mul<f64, Output=T> + Mul<T, Output=T> + Conj<Output=T> + Real<Output=f64> + Copy>(&mut self, input: &[T]) -> Result<f64, Box<dyn Error>> {
         if input.len() <= 0 {
             return Err(Box::new(AGCError(AGCErrorCode::SamplesTooLow, 0.0)))
         }

@@ -1,5 +1,7 @@
 use solid::filter::firdes;
-use solid::filter::fir_filter::{FIRFilter, float_filter::Filter};
+use solid::filter::iirdes;
+use solid::filter::fir_filter::FIRFilter;
+use solid::filter::filter::Filter;
 use solid::filter::iir_filter::{IIRFilter, IIRFilterType};
 use solid::filter::auto_correlator::AutoCorrelator;
 use solid::circular_buffer::CircularBuffer;
@@ -53,6 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let complex_coefs: Vec<Complex<f64>> = coefs.iter().map(|&x| Complex::new(x, 0.0)).collect();
     let mut filter = FIRFilter::new(&coefs, 1.0);
     let mut complex_filter = FIRFilter::<Complex<f64>, f64>::new(&complex_coefs, Complex::new(1.0, 1.0));
+    // let complex_iir_filter = IIRFilter::<Complex<f64>, f64>::new(&complex_coefs, &complex_coefs, IIRFilterType::Normal)?;
 
     let len = 500;
     let ivec: Vec<f64> = (-len/2..len/2).map(|x| (x as f64).cos() * 0.125).collect();
@@ -71,9 +74,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     
     let filter_output = filter.execute_block(&agc_vec);
     let _complex_filter_output = complex_filter.execute_block(&ivec);
-    let _filter_delay = Filter::group_delay(&filter, 0.125);
+    let _filter_delay = Filter::group_delay(&complex_filter, 0.125);
+    let _freq_response = Filter::frequency_response(&complex_filter, 1000.0);
+    // let _iir_filter_delay = Filter::group_delay(&complex_iir_filter, 0.125);
+    // let _iir_freq_response = Filter::frequency_response(&complex_iir_filter, 1000.0);
 
-    println!("{:?}", _complex_filter_output);
+    // println!("{:?}", _complex_filter_output);
+    // println!("{_freq_response} {_filter_delay}");
+    // println!("{_iir_filter_delay} {_iir_freq_response}");
 
     println!("{}", filter);
     println!("{}", complex_filter);
@@ -112,15 +120,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         imag.push(num.im);
     }
 
+    let freq = iirdes::frequency_pre_warp(0.20, 0.25, iirdes::BandType::LOWPASS);
+    // let zpkf = iirdes::bilinear_zpkf()
+
+    println!("{freq}");
+
     let dumb_pll_ff = [6039.61035, 4000.0, -2039.61035];
     let dumb_pll_fb = [4082.63281, -8163.26562, 4080.63281];
     let mut iir_filter = IIRFilter::new(&dumb_pll_ff, &dumb_pll_fb, IIRFilterType::SecondOrder)?;
-    let mut value = Complex::new(0.0, 0.0);
-    for i in 0..20 {
-        value = iir_filter.execute(second_fft_output[i]);
-    }
+    let _iir_output = iir_filter.execute_block(&second_fft_output);
+    let _iir_filter_delay = iir_filter.group_delay(0.35);
+    let _iir_freq_response = iir_filter.frequency_response(0.1);
 
-    println!("{} {}", value, second_fft_output[19]);
+    // println!("{iir_filter_delay} {iir_freq_response}");
 
     plot(&real, &imag, second_fft_output.len(), fft_size as f32)?;
 

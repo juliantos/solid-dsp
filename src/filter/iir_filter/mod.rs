@@ -5,9 +5,9 @@
 //! ```
 //! ```
 
-pub mod second_order;
+pub mod second_order_filter;
 
-use second_order::SecondOrder;
+use second_order_filter::SecondOrderFilter;
 use super::super::dot_product::{DotProduct, Direction, execute::Execute};
 use super::super::window::Window;
 
@@ -50,7 +50,7 @@ pub struct IIRFilter<C, T> {
     buffer: Window<T>,
     numerator_coefs: DotProduct<C>,
     denominator_coefs: DotProduct<C>,
-    second_order_sections: Vec<SecondOrder<C, T>>,
+    second_order_sections: Vec<SecondOrderFilter<C, T>>,
 }
 
 impl<C: Copy + Num + Sum, T: Copy> IIRFilter<C, T> {
@@ -104,7 +104,7 @@ impl<C: Copy + Num + Sum, T: Copy> IIRFilter<C, T> {
 
                 let mut second_order_vector = Vec::new();
                 for i in 0..len {
-                    second_order_vector.push(SecondOrder::new(&feed_forward[(3*i)..(3*i+3)], &feed_back[(3*i)..(3*i+3)])?);
+                    second_order_vector.push(SecondOrderFilter::new(&feed_forward[(3*i)..(3*i+3)], &feed_back[(3*i)..(3*i+3)])?);
                 }
 
                 Ok(IIRFilter {
@@ -143,5 +143,37 @@ impl<C: Copy + Num + Sum, T: Copy> IIRFilter<C, T> {
                 int_output
             }
         }
+    }
+
+    pub fn execute_block<Out>(&mut self, samples: &[T]) -> Vec<Out>
+    where DotProduct<C>: Execute<T, Output=Out>,
+          T: Sub<Out, Output=T>,
+          Out: Sub<Out, Output=T>
+    {
+        let mut block: Vec<Out> = vec![];
+        for &sample in samples.iter() {
+            block.push(self.execute(sample));
+        }
+        block
+    }
+
+    #[inline(always)]
+    pub fn numerator_coefs(&self) -> &Vec<C> {
+        self.numerator_coefs.coefficents()
+    }
+
+    #[inline(always)]
+    pub fn denominator_coefs(&self) -> &Vec<C> {
+        self.denominator_coefs.coefficents()
+    }
+
+    #[inline(always)]
+    pub fn second_order_filters(&self) -> &Vec<SecondOrderFilter<C, T>> {
+        &self.second_order_sections
+    }
+
+    #[inline(always)]
+    pub fn iir_type(&self) -> &IIRFilterType {
+        &self.iirtype
     }
 }

@@ -1,4 +1,8 @@
 pub mod complex;
+pub mod poly;
+
+use libm::copysign;
+use num::complex::Complex;
 
 use std::f64::consts::PI as PI_64;
 use std::f32::consts::PI as PI_32;
@@ -332,3 +336,49 @@ impl Gamma<f32> for f32 {
         }
     }
 }
+
+// FIXME: Windows Version
+// #[link(name = "m")]
+// extern {
+//     fn csqrtf(z: f64) -> Complex<f64>;
+// }
+
+pub trait ComplexSqrt {
+    /// Uses C++ csqrtf ffi to convert the complex square root
+    fn csqrt(&self) -> Complex<f64>;
+}
+
+impl ComplexSqrt for f64 {
+    #[inline]
+    fn csqrt(&self) -> Complex<f64> {
+        // unsafe { csqrtf(*self) }
+
+        // Wrote using the C Lib M as Reference
+        let &a = self;
+        let b = 0.0;
+
+        if a == 0.0 {
+            return Complex::new(a, b);
+        } 
+        if b.is_infinite() {
+            return Complex::new(std::f64::INFINITY, b);
+        }
+        if a.is_nan() {
+            return Complex::new(a, std::f64::NAN);
+        } 
+        if a.is_infinite() {
+            if a.is_sign_negative() {
+                return Complex::new((b - b).abs(), copysign(a, b))
+            } else {
+                return Complex::new(a , copysign(b - b, b));
+            }
+        }
+        if a >= 0.0 {
+            let t = ((a + a.hypot(b)) * 0.5).sqrt();
+            return Complex::new(t, b / (2.0 * t));
+        } else {
+            let t = ((a - a.hypot(b)) * 0.5).sqrt();
+            return Complex::new(b.abs() / (2.0 * t), copysign(t, b));
+        }
+    }
+} 

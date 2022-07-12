@@ -1,4 +1,4 @@
-//! Finite Input Response Filter Design
+//! Finite Inpulse Response Filter Design
 //! 
 //! 
 pub mod filter_traits;
@@ -567,7 +567,7 @@ pub fn filter_energy(filter: &[f64], cutoff_frequency: f64, fft_size: usize) -> 
         let f = 0.5 * i as f64 / fft_size as f64;
 
         for k in 0..filter.len() {
-            ejwt[k] = (Complex::new(0.0, 1.0) * 2.0 * PI_64 * f * k as f64).exp();
+            ejwt[k] = Complex::from_polar(1.0, 2.0 * PI_64 * f * k as f64);
         }
 
         let v = Execute::execute(&dp, &ejwt);

@@ -3,22 +3,30 @@ use std::ops::Neg;
 use num::{Complex, Num};
 
 pub trait Conj {
-    fn conj(&self) -> Self;
+    type Output;
+
+    fn conj(&self) -> Self::Output;
 }
 
 impl Conj for f32 {
+    type Output = f32;
+
     #[inline(always)]
-    fn conj(&self) -> Self { self.clone() }
+    fn conj(&self) -> Self::Output { self.clone() }
 }
 
 impl Conj for f64 {
+    type Output = f64;
+
     #[inline(always)]
-    fn conj(&self) -> Self { self.clone() }
+    fn conj(&self) -> Self::Output { self.clone() }
 }
 
-impl<T: Clone + Num + Neg<Output=T>> Conj for Complex<T> {
+impl<T: Copy + Num + Neg<Output=T>> Conj for Complex<T> {
+    type Output = Complex<T>;
+
     #[inline(always)]
-    fn conj(&self) -> Self {
+    fn conj(&self) -> Self::Output {
         Complex::conj(self)
     }
 }

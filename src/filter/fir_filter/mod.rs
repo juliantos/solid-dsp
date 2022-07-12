@@ -6,7 +6,8 @@
 //! # Example
 //! 
 //! ```
-//! use solid::filter::fir_filter::{FIRFilter, float_filter::Filter};
+//! use solid::filter::fir_filter::FIRFilter;
+//! use solid::filter::filter::Filter;
 //! use solid::filter::firdes;
 //! use num::complex::Complex;
 //! 
@@ -16,8 +17,6 @@
 //! };
 //! let filter = FIRFilter::<f64, Complex<f64>>::new(&coefs, 1.0);
 //! ```
-
-pub mod float_filter;
 
 use super::super::dot_product::{DotProduct, Direction, execute::Execute};
 use super::super::window::Window;
@@ -189,8 +188,8 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
           Out: Mul<C, Output=Out>
     {
         let mut block: Vec<Out> = vec![];
-        for i in 0..samples.len() {
-            self.push(samples[i]);
+        for &sample in samples.iter() {
+            self.push(sample);
             block.push(self.execute());
         }
         block
