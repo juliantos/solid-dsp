@@ -6,8 +6,8 @@ use std::error::Error;
 
 use num::complex::Complex;
 
-const ITERATIONS: usize = 16;
-const TOLERANCE: f64 = -1e22;
+const ITERATIONS: usize = 24;
+const TOLERANCE: f64 = 1e-16;
 
 #[derive(Debug)]
 enum PolynomialErrorCode {
@@ -37,6 +37,15 @@ impl Error for PolynomialError {}
 /// # Example
 /// 
 /// ```
+/// use solid::math::poly::find_roots;
+/// use num::complex::Complex;
+/// 
+/// let polynomial = [6.0, 11.0, -33.0, -33.0, 11.0, 6.0];
+/// 
+/// let roots = find_roots(&polynomial).unwrap();
+/// 
+/// let output = vec![Complex::new(-3.0, 0.0), Complex::new(-1.0, 0.0), Complex::new(-1.0/3.0, 0.0), Complex::new(0.5, 0.0), Complex::new(2.0, 0.0)];
+/// assert_eq!(roots, output);
 /// ```
 pub fn find_roots(polynomials: &[f64]) -> Result<Vec<Complex<f64>>, Box<dyn Error>> {
     let mut roots = find_roots_bairstow(polynomials)?;
@@ -66,7 +75,7 @@ pub fn find_roots(polynomials: &[f64]) -> Result<Vec<Complex<f64>>, Box<dyn Erro
     Ok(roots)
 }
 
-/// Finds the COmplex Roots of the Polynomial using Bairstow
+/// Finds the Complex Roots of the Polynomial using Bairstow
 /// 
 /// # Arguments
 /// 
@@ -75,9 +84,18 @@ pub fn find_roots(polynomials: &[f64]) -> Result<Vec<Complex<f64>>, Box<dyn Erro
 /// # Example
 /// 
 /// ```
+/// use solid::math::poly::find_roots_bairstow;
+/// use num::complex::Complex;
+/// 
+/// let polynomial = [6.0, 11.0, -33.0, -33.0, 11.0, 6.0];
+/// 
+/// let roots = find_roots_bairstow(&polynomial).unwrap();
+/// 
+/// let output = vec![Complex::new(-1.0/3.0, 0.0), Complex::new(-1.0, 0.0), Complex::new(2.0, 0.0), Complex::new(-3.0, 0.0), Complex::new(0.5, 0.0)];
+/// assert_eq!(roots, output);
 /// ```
 pub fn find_roots_bairstow(polynomials: &[f64]) -> Result<Vec<Complex<f64>>, Box<dyn Error>> {
-    let input_poly: Vec<f64> = vec![];
+    let mut input_poly: Vec<f64> = polynomials.to_vec();
     let mut output_poly: Vec<f64> = vec![];
     let mut roots: Vec<Complex<f64>> = vec![];
 
@@ -101,6 +119,7 @@ pub fn find_roots_bairstow(polynomials: &[f64]) -> Result<Vec<Complex<f64>>, Box
 
             u = input_poly[n - 2] / input_poly[n - 1];
             v = input_poly[n - 3] / input_poly[n - 1];
+
             if n > 3 {
                 (output_poly, u, v) = find_roots_bairstow_persistent(&input_poly, u, v)?;
             }
@@ -111,8 +130,11 @@ pub fn find_roots_bairstow(polynomials: &[f64]) -> Result<Vec<Complex<f64>>, Box
 
             u = output_poly[n - 2] / output_poly[n - 1];
             v = output_poly[n - 3] / output_poly[n - 1];
-        }
 
+            if n > 3 {
+                (input_poly, u, v) = find_roots_bairstow_persistent(&output_poly, u, v)?;
+            }
+        }
 
         let root = (u * u - 4.0 * v).csqrt();
         let complex_root_0 = 0.5 * (-u + root);
@@ -163,7 +185,9 @@ pub fn find_roots_bairstow_recursion(polynomials: &[f64], u_estimate: f64, v_est
     let mut f = vec![0.0; n + 1];
 
     while iterations != ITERATIONS {
-        for i in ((n - 2)..=(0)).rev() {
+        iterations += 1;
+
+        for i in (0..=(n - 2)).rev() {
             b[i] = polynomials[i + 2] - u * b[i + 1] - v * b[i + 2];
             f[i] = b[i + 2] - u * f[i + 1] - v * f[i + 2];
         }
@@ -195,8 +219,6 @@ pub fn find_roots_bairstow_recursion(polynomials: &[f64], u_estimate: f64, v_est
         if step < TOLERANCE {
             break;
         }
-
-        iterations += 1;
     }
 
     let mut reduced_polynomials = vec![0.0; n - 1];
@@ -265,13 +287,24 @@ pub fn expand_binomial(roots: usize) -> Vec<f64> {
     output.append(&mut zeros);
 
     for i in 0..roots {
-        for j in ((i + 1)..0).rev() {
+        for j in (1..=(i + 1)).rev() {
             output[j] = output[j] + output[j - 1];
         }
     }
     output
 }
 
+/// Expands the Binomial P_n(x) = (1 + x)^m * (1 - x)^k as 
+/// P_n(x) = p[0]*x + p[1]*x + p[2]*x^2 + ... + p[n]*x^n
+/// 
+/// # Arguments
+/// 
+/// * `` - 
+/// 
+/// # Example
+/// 
+/// ```
+/// ```
 pub fn expand_binomial_pm(m_roots: usize, k_roots: usize) -> Vec<f64> {
     let roots = m_roots + k_roots;
     let mut output = Vec::new();
@@ -285,13 +318,13 @@ pub fn expand_binomial_pm(m_roots: usize, k_roots: usize) -> Vec<f64> {
     output.append(&mut zeros);
 
     for i in 0..m_roots {
-        for j in ((i + 1)..0).rev() {
+        for j in  (1..=(i + 1)).rev() {
             output[j] = output[j] + output[j - 1];
         }
     }
 
     for i in m_roots..roots {
-        for j in ((i + 1)..0).rev() {
+        for j in  (1..=(i + 1)).rev() {
             output[j] = output[j] - output[j - 1];
         }
     }

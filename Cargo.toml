@@ -12,6 +12,7 @@ rand = "0.8.4"
 plotters = "0.3.1"
 slow_primes = "0.1.14"
 either = "1.6.1"
+libm = "0.2.1"
 
 [lib]
 name = "solid"

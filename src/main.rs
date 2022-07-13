@@ -8,6 +8,7 @@ use solid::circular_buffer::CircularBuffer;
 use solid::auto_gain_control::AGC;
 use solid::nco::NCO;
 use solid::fft::{FFT, FFTDirection, FFTFlags};
+use solid::math::poly::find_roots;
 
 use std::error::Error;
 
@@ -135,6 +136,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     // println!("{iir_filter_delay} {iir_freq_response}");
 
     plot(&real, &imag, second_fft_output.len(), fft_size as f32)?;
+
+    let polynomial = [6.0, 11.0, -33.0, -33.0, 11.0, 6.0];
+    let roots = find_roots(&polynomial)?;
+
+    println!("{:?}", roots);
 
     Ok(())
 }
