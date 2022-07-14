@@ -6,7 +6,7 @@ use std::error::Error;
 
 use num::complex::Complex;
 
-const ITERATIONS: usize = 24;
+const ITERATIONS: usize = 32;
 const TOLERANCE: f64 = 1e-16;
 
 #[derive(Debug)]
@@ -169,6 +169,15 @@ pub fn find_roots_bairstow(polynomials: &[f64]) -> Result<Vec<Complex<f64>>, Box
 /// # Example
 /// 
 /// ```
+/// use solid::math::poly::find_roots_bairstow_recursion;
+/// use num::complex::Complex;
+/// 
+/// let polynomial = [6.0, -9.0, -9.0, 6.0];
+/// 
+/// let roots = find_roots_bairstow_recursion(&polynomial, -1.5, -1.5).unwrap();
+/// 
+/// let output = vec![-3.0, 6.0];
+/// assert_eq!(roots, (output, -1.0, -2.0));
 /// ```
 pub fn find_roots_bairstow_recursion(polynomials: &[f64], u_estimate: f64, v_estimate: f64) -> Result<(Vec<f64>, f64, f64), Box<dyn Error>> {
     if polynomials.len() < 3 {
@@ -245,6 +254,15 @@ pub fn find_roots_bairstow_recursion(polynomials: &[f64], u_estimate: f64, v_est
 /// # Example
 /// 
 /// ```
+/// use solid::math::poly::find_roots_bairstow_persistent;
+/// use num::complex::Complex;
+/// 
+/// let polynomial = [6.0, 11.0, -33.0, -33.0, 11.0, 6.0];
+/// 
+/// let roots = find_roots_bairstow_persistent(&polynomial, 1.8333333333333333333333, -5.5).unwrap();
+/// 
+/// let output = vec![18.0, -39.0, 3.0, 6.0];
+/// assert_eq!(roots, (output, -4.0 / 3.0, -1.0 / 3.0));
 /// ```
 pub fn find_roots_bairstow_persistent(polynomials: &[f64], u_estimate: f64, v_estimate: f64) -> Result<(Vec<f64>, f64, f64), Box<dyn Error>> {
     let mut u = u_estimate;
