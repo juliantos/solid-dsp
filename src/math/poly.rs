@@ -262,7 +262,7 @@ pub fn find_roots_bairstow_recursion(polynomials: &[f64], u_estimate: f64, v_est
 /// let roots = find_roots_bairstow_persistent(&polynomial, 1.8333333333333333333333, -5.5).unwrap();
 /// 
 /// let output = vec![18.0, -39.0, 3.0, 6.0];
-/// assert_eq!(roots, (output, -4.0 / 3.0, -1.0 / 3.0));
+/// assert_eq!(roots, (output, 4.0 / 3.0, 1.0 / 3.0));
 /// ```
 pub fn find_roots_bairstow_persistent(polynomials: &[f64], u_estimate: f64, v_estimate: f64) -> Result<(Vec<f64>, f64, f64), Box<dyn Error>> {
     let mut u = u_estimate;
@@ -286,11 +286,16 @@ pub fn find_roots_bairstow_persistent(polynomials: &[f64], u_estimate: f64, v_es
 /// 
 /// # Arguments
 /// 
-/// * `` - 
+/// * `roots` - The Power of the binomial
 /// 
 /// # Example
 /// 
 /// ```
+/// use solid::math::poly::expand_binomial;
+/// 
+/// let polynomial = expand_binomial(5);
+/// assert_eq!(polynomial, vec![1.0, 5.0, 10.0, 10.0, 5.0, 1.0]);
+/// 
 /// ```
 pub fn expand_binomial(roots: usize) -> Vec<f64> {
     let mut output = Vec::new();
@@ -301,7 +306,7 @@ pub fn expand_binomial(roots: usize) -> Vec<f64> {
     }
 
     output.push(1.0);
-    let mut zeros = vec![0.0f64; roots - 1];
+    let mut zeros = vec![0.0f64; roots];
     output.append(&mut zeros);
 
     for i in 0..roots {
@@ -317,11 +322,16 @@ pub fn expand_binomial(roots: usize) -> Vec<f64> {
 /// 
 /// # Arguments
 /// 
-/// * `` - 
+/// * `m_roots` - M roots
+/// * `k_roots` - K roots 
 /// 
 /// # Example
 /// 
 /// ```
+/// use solid::math::poly::expand_binomial_pm;
+/// 
+/// let polynomial = expand_binomial_pm(4, 3);
+/// assert_eq!(polynomial, vec![1.0, 1.0, -3.0, -3.0, 3.0, 3.0, -1.0, -1.0]);
 /// ```
 pub fn expand_binomial_pm(m_roots: usize, k_roots: usize) -> Vec<f64> {
     let roots = m_roots + k_roots;
@@ -332,7 +342,7 @@ pub fn expand_binomial_pm(m_roots: usize, k_roots: usize) -> Vec<f64> {
     }
 
     output.push(1.0);
-    let mut zeros = vec![0.0; roots - 1];
+    let mut zeros = vec![0.0; roots];
     output.append(&mut zeros);
 
     for i in 0..m_roots {

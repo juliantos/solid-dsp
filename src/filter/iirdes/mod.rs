@@ -44,6 +44,8 @@ impl Error for IirdesError {}
 /// ```
 /// use solid::filter::iirdes::{frequency_pre_warp, BandType};
 /// let freq = frequency_pre_warp(0.35, 0.0, BandType::LOWPASS);
+/// 
+/// assert_eq!((freq * 10000.0).round() / 10000.0, 1.9626);
 /// ```
 pub fn frequency_pre_warp(cutoff: f64, center_frequency: f64, bandtype: BandType) -> f64 {
     match bandtype {
@@ -65,6 +67,26 @@ pub fn frequency_pre_warp(cutoff: f64, center_frequency: f64, bandtype: BandType
     }
 }
 
+/// Compute Bilinear Z Transform using polynomial expansion
+/// 
+/// # Arguments
+/// 
+/// * `` -
+/// 
+/// # Examples
+/// 
+/// ```
+/// use solid::filter::iirdes::*;
+/// use num::complex::Complex;
+/// 
+/// let pre_warp = frequency_pre_warp(0.35, 0.0, BandType::LOWPASS);
+/// let analog_zeros = vec![Complex::new(-0.1, 4.0), Complex::new(1.0, 0.1), Complex::new(3000.0, -2.0)];
+/// let analog_poles = vec![Complex::new(0.0, 3.0), Complex::new(2.1, 3.1), Complex::new(0.0, 0.0)];
+/// let gain = Complex::new(1.21, 0.717);
+/// let (digital_zeros, digital_poles, digital_gain) = bilinear_analog_to_digital(&analog_zeros, &analog_poles, gain, pre_warp);
+/// 
+/// assert_eq!(digital_zeros, []);
+/// ```
 pub fn bilinear_analog_to_digital(analog_zeros: &[Complex<f64>], analog_poles: &[Complex<f64>], nominal_gain: Complex<f64>, frequency_pre_warp: f64) -> (Vec<Complex<f64>>, Vec<Complex<f64>>, Complex<f64>) {
     let mut digital_zeros: Vec<Complex<f64>> = vec![];
     let mut digital_poles: Vec<Complex<f64>> = vec![];
@@ -91,6 +113,7 @@ pub fn bilinear_analog_to_digital(analog_zeros: &[Complex<f64>], analog_poles: &
     (digital_zeros, digital_poles, digital_gain)
 }
 
+/// Compute Bilinear
 pub fn bilinear_numerator_denominator(numerators: &[Complex<f64>], denominators: &[Complex<f64>], bilateral_warping_factor: f64) -> Result<(Vec<Complex<f64>>, Vec<Complex<f64>>), Box<dyn Error>> {
     if numerators.len() == 0 || denominators.len() == 0 {
         return Err(Box::new(IirdesError(IirdesErrorCode::InvalidOrder)))
