@@ -67,11 +67,14 @@ pub fn frequency_pre_warp(cutoff: f64, center_frequency: f64, bandtype: BandType
     }
 }
 
-/// Compute Bilinear Z Transform using polynomial expansion
+/// Compute Bilinear Z Transform using polynomial expansion in pole-zero form
 /// 
 /// # Arguments
 /// 
-/// * `` -
+/// * `analog_zeros` - Zeros of the analog s-domain transfer function
+/// * `analog_poles` - Poles of the analog s-domain transfer function
+/// * `nominal_gain` - Scalar gain of the s-domain transfer function
+/// * `frequency_pre_warp` -  Scalar sample rate
 /// 
 /// # Examples
 /// 
@@ -85,7 +88,10 @@ pub fn frequency_pre_warp(cutoff: f64, center_frequency: f64, bandtype: BandType
 /// let gain = Complex::new(1.21, 0.717);
 /// let (digital_zeros, digital_poles, digital_gain) = bilinear_analog_to_digital(&analog_zeros, &analog_poles, gain, pre_warp);
 /// 
-/// assert_eq!(digital_zeros, []);
+/// 
+/// assert_eq!(digital_zeros.len(), 3);
+/// assert_eq!(digital_poles.len(), 3);
+/// assert_eq!(digital_gain, Complex::new(0.0, 0.0));
 /// ```
 pub fn bilinear_analog_to_digital(analog_zeros: &[Complex<f64>], analog_poles: &[Complex<f64>], nominal_gain: Complex<f64>, frequency_pre_warp: f64) -> (Vec<Complex<f64>>, Vec<Complex<f64>>, Complex<f64>) {
     let mut digital_zeros: Vec<Complex<f64>> = vec![];
@@ -113,7 +119,18 @@ pub fn bilinear_analog_to_digital(analog_zeros: &[Complex<f64>], analog_poles: &
     (digital_zeros, digital_poles, digital_gain)
 }
 
-/// Compute Bilinear
+/// Compute Bilinear Z Transform using polynomial expansion specified by numerator and denominator
+/// 
+/// # Arguments
+/// 
+/// * `numerators` - Numerator Coefficients of the analog transfer function
+/// * `denominators` - Denominator Coefficients of the analog transfer function
+/// * `bilateral_warping_factor` - Scalar for the `sample rate` warping factor
+/// 
+/// # Examples
+/// 
+/// ```
+/// ```
 pub fn bilinear_numerator_denominator(numerators: &[Complex<f64>], denominators: &[Complex<f64>], bilateral_warping_factor: f64) -> Result<(Vec<Complex<f64>>, Vec<Complex<f64>>), Box<dyn Error>> {
     if numerators.len() == 0 || denominators.len() == 0 {
         return Err(Box::new(IirdesError(IirdesErrorCode::InvalidOrder)))
