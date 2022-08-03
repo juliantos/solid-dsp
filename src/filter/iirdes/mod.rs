@@ -130,6 +130,17 @@ pub fn bilinear_analog_to_digital(analog_zeros: &[Complex<f64>], analog_poles: &
 /// # Examples
 /// 
 /// ```
+/// use solid::filter::iirdes::*;
+/// use num::complex::Complex;
+/// 
+/// let pre_warp = frequency_pre_warp(0.35, 0.0, BandType::LOWPASS);
+/// let numerators = vec![Complex::new(1.0, 0.0), Complex::new(2.0, 0.0), Complex::new(3.0, 0.0)];
+/// let denominators = vec![Complex::new(0.0, 1.0), Complex::new(0.0, 2.0), Complex::new(0.0, 3.0)];
+/// 
+/// let (digital_zeros, digital_poles) = bilinear_numerator_denominator(&numerators, &denominators, pre_warp).unwrap_or((vec![], vec![]));
+/// 
+/// assert_eq!(digital_zeros, vec![Complex::new(0.0, -1.0), Complex::new(0.0, -1.0)]);
+/// assert_eq!(digital_poles, vec![Complex::new(1.0, 0.0), Complex::new(1.0, 0.0)]);
 /// ```
 pub fn bilinear_numerator_denominator(numerators: &[Complex<f64>], denominators: &[Complex<f64>], bilateral_warping_factor: f64) -> Result<(Vec<Complex<f64>>, Vec<Complex<f64>>), Box<dyn Error>> {
     if numerators.len() == 0 || denominators.len() == 0 {
