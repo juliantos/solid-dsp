@@ -121,6 +121,8 @@ pub fn bilinear_analog_to_digital(analog_zeros: &[Complex<f64>], analog_poles: &
 
 /// Compute Bilinear Z Transform using polynomial expansion specified by numerator and denominator
 /// 
+/// See reference: https://web.mit.edu/2.14/www/Handouts/PoleZero.pdf
+/// 
 /// # Arguments
 /// 
 /// * `numerators` - Numerator Coefficients of the analog transfer function
@@ -187,4 +189,82 @@ pub fn bilinear_numerator_denominator(numerators: &[Complex<f64>], denominators:
     }
 
     Ok((numerator_output_digital_filter, denominator_output_digital_filter))
+}
+
+
+// TODO: Bilinear Space-State Transforms
+
+/// Flips a digital low-pass filter to a digital high-pass filter or vice-versa
+/// 
+/// # Arguments
+/// 
+/// * `zeros` - Digital Zeros
+/// * `poles` - Digital Poles
+/// 
+/// # Examples
+/// 
+/// ```
+/// use solid::filter::iirdes::*;
+/// use num::complex::Complex;
+/// 
+/// let zeros = [Complex::new(1.0, -1.0)];
+/// let poles = [Complex::new(2.0, -2.0)];
+/// 
+/// let (new_zeros, new_poles) = digital_filter_flip_pass(&zeros, &poles).unwrap();
+/// 
+/// assert_eq!(new_zeros, [Complex::new(-1.0, 1.0)]);
+/// assert_eq!(new_poles, [Complex::new(-2.0, 2.0)]);
+/// ```
+pub fn digital_filter_flip_pass(zeros: &[Complex<f64>], poles: &[Complex<f64>]) -> Result<(Vec<Complex<f64>>, Vec<Complex<f64>>), Box<dyn Error>> {
+    if zeros.len() != poles.len() {
+        return Err(Box::new(IirdesError(IirdesErrorCode::InvalidOrder)));
+    }
+
+    let output_zeros: Vec<Complex<f64>> = zeros.iter().map(|x| -x).collect();
+    let output_poles: Vec<Complex<f64>> = poles.iter().map(|x| -x).collect();
+
+    Ok((output_zeros, output_poles))
+}
+
+/// Flips a digital low-pass filter to a digital high-pass filter or vice-versa
+/// 
+/// # Arguments
+/// 
+/// * `zeros` - Digital Zeros
+/// * `poles` - Digital Poles
+/// * `shift` - Frequency to shift
+/// 
+/// # Examples
+/// 
+/// ```
+/// use solid::filter::iirdes::*;
+/// use num::complex::Complex;
+/// 
+/// let zeros = [Complex::new(0.9, 0.0), Complex::new(0.9, 0.0), Complex::new(0.3, 0.0), Complex::new(0.1, 0.0), Complex::new(-0.5, 0.0)];
+/// let poles = [Complex::new(0.0, 0.0), Complex::new(0.0, 0.0), Complex::new(0.0, 0.0), Complex::new(0.0, 0.0), Complex::new(0.0, 0.0)];
+/// 
+/// let (new_zeros, new_poles) = digital_filter_shift(&zeros, &poles, 0.5).unwrap();
+/// 
+/// assert_eq!(new_zeros, []);
+/// ```
+pub fn digital_filter_shift(zeros: &[Complex<f64>], poles: &[Complex<f64>], shift: f64) -> Result<(Vec<Complex<f64>>, Vec<Complex<f64>>), Box<dyn Error>> {
+    if zeros.len() != poles.len() {
+        return Err(Box::new(IirdesError(IirdesErrorCode::InvalidOrder)));
+    }
+
+    let c = (2.0 * std::f64::consts::PI * shift).cos();
+    let one = Complex::new(1.0, 0.0);
+    let mut output_zeros = vec![Complex::new(0.0, 0.0); zeros.len() * 2];
+    let mut output_poles = vec![Complex::new(0.0, 0.0); zeros.len() * 2];
+    for i in 0..zeros.len() {
+        let t = zeros[i] + one;
+        output_zeros[2 * i + 0] = 0.5 * (c * t + (c * c * t * t - 4.0 * zeros[i]).sqrt());
+        output_zeros[2 * i + 1] = 0.5 * (c * t - (c * c * t * t - 4.0 * zeros[i]).sqrt());
+
+        let t = poles[i] + one;
+        output_poles[2 * i + 0] = 0.5 * (c * t + (c * c * t * t - 4.0 * poles[i]).sqrt());
+        output_poles[2 * i + 1] = 0.5 * (c * t - (c * c * t * t - 4.0 * poles[i]).sqrt());
+    }
+
+    Ok((output_zeros, output_poles))
 }
