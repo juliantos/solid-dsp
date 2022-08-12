@@ -1,4 +1,8 @@
-//! Infinite Inpulse Response Filter Design
+//! Infinite Impulse Response Filter Design
+
+pub mod pll;
+
+use crate::math::poly::find_roots;
 
 use super::super::math::poly;
 
@@ -17,7 +21,10 @@ pub enum BandType {
 #[derive(Debug)]
 enum IirdesErrorCode {
     InvalidOrder,
-    InvalidNumeratorSize
+    InvalidNumeratorSize,
+    InvalidBandwidth,
+    InvalidDampingFactor,
+    InvalidGain
 }
 
 #[derive(Debug)]
@@ -121,7 +128,7 @@ pub fn bilinear_analog_to_digital(analog_zeros: &[Complex<f64>], analog_poles: &
 
 /// Compute Bilinear Z Transform using polynomial expansion specified by numerator and denominator
 /// 
-/// See reference: https://web.mit.edu/2.14/www/Handouts/PoleZero.pdf
+/// See reference: <https://web.mit.edu/2.14/www/Handouts/PoleZero.pdf>
 /// 
 /// # Arguments
 /// 
@@ -245,7 +252,8 @@ pub fn digital_filter_flip_pass(zeros: &[Complex<f64>], poles: &[Complex<f64>]) 
 /// 
 /// let (new_zeros, new_poles) = digital_filter_shift(&zeros, &poles, 0.5).unwrap();
 /// 
-/// assert_eq!(new_zeros, []);
+/// assert_eq!(new_zeros[8], Complex::new(0.5, 0.0));
+/// assert_eq!(new_poles.len(), 10);
 /// ```
 pub fn digital_filter_shift(zeros: &[Complex<f64>], poles: &[Complex<f64>], shift: f64) -> Result<(Vec<Complex<f64>>, Vec<Complex<f64>>), Box<dyn Error>> {
     if zeros.len() != poles.len() {
@@ -267,4 +275,50 @@ pub fn digital_filter_shift(zeros: &[Complex<f64>], poles: &[Complex<f64>], shif
     }
 
     Ok((output_zeros, output_poles))
+}
+
+/// Checks the stability of a filter
+/// 
+/// # Arguments
+/// 
+/// * `feed_forward_coefs` -
+/// * `feed_back_coefs` - 
+/// 
+/// # Example
+/// 
+/// ```
+/// use solid::filter::iirdes::*;
+/// 
+/// let ff_coefs = [0.3, 0.9, 0.3];
+/// let mut fb_coefs = [0.2, 0.2, 0.2];
+/// 
+/// let stability = stable(&ff_coefs, &fb_coefs).unwrap();
+/// 
+/// assert_eq!(stability, true);
+/// 
+/// fb_coefs[1] = 0.78;
+/// 
+/// let stability = stable(&ff_coefs, &fb_coefs).unwrap();
+/// 
+/// assert_eq!(stability, false);
+/// ```
+pub fn stable(_feed_forward_coefs: &[f64], feed_back_coefs: &[f64]) -> Result<bool, Box<dyn Error>> {
+    if feed_back_coefs.len() != feed_back_coefs.len() {
+        return Ok(false);
+    } else if feed_back_coefs.len() < 2 {
+        return Ok(false)
+    }
+
+    let mut a_hat = feed_back_coefs.to_vec();
+    a_hat.reverse();
+
+    let roots = find_roots(&a_hat)?;
+    
+    for &i in roots.iter() {
+        if i.norm() > 1.0 {
+            return Ok(false)
+        }
+    }
+
+    return Ok(true)
 }

@@ -1,4 +1,4 @@
-//! Finite Inpulse Response Filter Design
+//! Finite Impulse Response Filter Design
 //! 
 //! 
 pub mod filter_traits;

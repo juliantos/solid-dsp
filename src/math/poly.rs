@@ -282,7 +282,7 @@ pub fn find_roots_bairstow_persistent(polynomials: &[f64], u_estimate: f64, v_es
 }
 
 
-/// Expands the Binomial P_n(x) = (1 + x)^n as P_n(x) = p[0]*x + p[1]*x + p[2]*x^2 + ... + p[n]*x^n
+/// Expands the Binomial P_n(x) = (1 + x)^n as P_n(x) = p\[0\]*x + p\[1\]*x + p\[2\]*x^2 + ... + p\[n\]*x^n
 /// 
 /// # Arguments
 /// 
@@ -318,7 +318,7 @@ pub fn expand_binomial(roots: usize) -> Vec<f64> {
 }
 
 /// Expands the Binomial P_n(x) = (1 + x)^m * (1 - x)^k as 
-/// P_n(x) = p[0]*x + p[1]*x + p[2]*x^2 + ... + p[n]*x^n
+/// P_n(x) = p\[0\]*x + p\[1\]*x + p\[2\]*x^2 + ... + p\[n\]*x^n
 /// 
 /// # Arguments
 /// 

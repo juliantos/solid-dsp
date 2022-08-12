@@ -1,8 +1,17 @@
-//! An Infinite Inpulse Response Filter
+//! An Infinite Impulse Response Filter
 //! 
 //! # Example
 //! 
 //! ```
+//! use solid::filter::*;
+//! use num::complex::Complex;
+//! 
+//! let coefs = match iirdes::pll::active_lag(0.35, 1.0 / (2.0f64).sqrt(), 1000.0) {
+//!     Ok(coefs) => coefs,
+//!     _ => (vec![], vec![])
+//! };
+//! 
+//! let filter = iir_filter::IIRFilter::<f64, Complex<f64>>::new(&coefs.0, &coefs.1, iir_filter::IIRFilterType::Normal);
 //! ```
 
 pub mod second_order_filter;
@@ -175,5 +184,11 @@ impl<C: Copy + Num + Sum, T: Copy> IIRFilter<C, T> {
     #[inline(always)]
     pub fn iir_type(&self) -> &IIRFilterType {
         &self.iirtype
+    }
+}
+
+impl<C: fmt::Display, T: fmt::Display> fmt::Display for IIRFilter<C, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "IIR<{}>", std::any::type_name::<C>())
     }
 }

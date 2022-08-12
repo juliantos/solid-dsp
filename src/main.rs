@@ -1,14 +1,6 @@
-use solid::filter::firdes;
 use solid::filter::iirdes;
-use solid::filter::fir_filter::FIRFilter;
-use solid::filter::filter::Filter;
-use solid::filter::iir_filter::{IIRFilter, IIRFilterType};
-use solid::filter::auto_correlator::AutoCorrelator;
-use solid::circular_buffer::CircularBuffer;
-use solid::auto_gain_control::AGC;
+use solid::filter::iir_filter::*;
 use solid::nco::NCO;
-use solid::fft::{FFT, FFTDirection, FFTFlags};
-use solid::math::poly::*;
 
 use std::error::Error;
 
@@ -52,49 +44,8 @@ fn plot(real: &[f64], imag: &[f64], len: usize, height: f32) -> Result<(), Box<d
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let coefs = firdes::firdes_notch(25, 0.2, 30.0)?;
-    let complex_coefs: Vec<Complex<f64>> = coefs.iter().map(|&x| Complex::new(x, 0.0)).collect();
-    let mut filter = FIRFilter::new(&coefs, 1.0);
-    let mut complex_filter = FIRFilter::<Complex<f64>, f64>::new(&complex_coefs, Complex::new(1.0, 1.0));
-    // let complex_iir_filter = IIRFilter::<Complex<f64>, f64>::new(&complex_coefs, &complex_coefs, IIRFilterType::Normal)?;
-
-    let len = 500;
-    let ivec: Vec<f64> = (-len/2..len/2).map(|x| (x as f64).cos() * 0.125).collect();
-    let qvec: Vec<f64> = (-len/2..len/2).map(|x| (x as f64).sin() * 0.125).collect();
-    let complex_vec : Vec<Complex<f64>> = ivec.iter().zip(qvec.iter()).map(|(&x, &y)| Complex::new(x, y)).collect();
-
-    let _circular_buffer = CircularBuffer::from_slice(&complex_vec);
-    // println!("{}", circular_buffer);
-
-    let mut agc = AGC::new();
-    println!("{}", agc);
-    agc.squelch_enable();
-    agc.set_bandwidth(0.01)?;
-    agc.squelch_set_threshold(-22.0);
-    let agc_vec = agc.execute_block(&complex_vec);
-    
-    let filter_output = filter.execute_block(&agc_vec);
-    let _complex_filter_output = complex_filter.execute_block(&ivec);
-    let _filter_delay = Filter::group_delay(&complex_filter, 0.125);
-    let _freq_response = Filter::frequency_response(&complex_filter, 1000.0);
-    // let _iir_filter_delay = Filter::group_delay(&complex_iir_filter, 0.125);
-    // let _iir_freq_response = Filter::frequency_response(&complex_iir_filter, 1000.0);
-
-    // println!("{:?}", _complex_filter_output);
-    // println!("{_freq_response} {_filter_delay}");
-    // println!("{_iir_filter_delay} {_iir_freq_response}");
-
-    println!("{}", filter);
-    println!("{}", complex_filter);
-
     let mut real = vec![];
     let mut imag = vec![];
-
-
-    let mut auto_corr = AutoCorrelator::<f64>::new(10, 5);
-    let _auto_corr_output = auto_corr.execute_block(&filter_output);
-
-    println!("{}", auto_corr);
 
     let mut nco = NCO::new();
     nco.set_frequency(0.1);
@@ -105,43 +56,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         nco.step();
     }
 
-    println!("{}", nco);
 
-    let fft_size = 129 * 7;
-    let fftf = FFT::new(fft_size, FFTDirection::FORWARD, FFTFlags::ESTIMATE);
-    let fftr = FFT::new(fft_size, FFTDirection::REVERSE, FFTFlags::ESTIMATE);
-    let fft_output = fftf.execute(&nco_output)?;
-    let second_fft_output = fftr.execute(&fft_output)?;
+    let filter = iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0)?;
+    let mut iir_filter = IIRFilter::new(&filter.0, &filter.1, IIRFilterType::SecondOrder)?;
+    let iir_output = iir_filter.execute_block(&nco_output);
 
-    println!("{}", fftf);
-    println!("{}", fftr);
+    assert_eq!(iirdes::stable(&filter.0, &filter.1)?, false);
 
-    for num in fft_output.iter() {
+    for num in iir_output.iter() {
         real.push(num.re);
         imag.push(num.im);
     }
 
-    let freq = iirdes::frequency_pre_warp(0.20, 0.25, iirdes::BandType::LOWPASS);
-    // let zpkf = iirdes::bilinear_zpkf()
-
-    println!("{freq}");
-
-    let dumb_pll_ff = [6039.61035, 4000.0, -2039.61035];
-    let dumb_pll_fb = [4082.63281, -8163.26562, 4080.63281];
-    let mut iir_filter = IIRFilter::new(&dumb_pll_ff, &dumb_pll_fb, IIRFilterType::SecondOrder)?;
-    let _iir_output = iir_filter.execute_block(&second_fft_output);
-    let _iir_filter_delay = iir_filter.group_delay(0.35);
-    let _iir_freq_response = iir_filter.frequency_response(0.1);
-
-    // println!("{iir_filter_delay} {iir_freq_response}");
-
-    // plot(&real, &imag, second_fft_output.len(), fft_size as f32)?;
-
-    let polynomial = [6.0, 11.0, -33.0, -33.0, 11.0, 6.0];
-    // let _roots = find_roots(&polynomial)?;
-    let rec_roots = find_roots_bairstow_persistent(&polynomial, 1.83333333333333333333, -5.5)?;
-
-    println!("{:?}", rec_roots);
+    plot(&real, &imag, iir_output.len(), 1000.0)?;
 
     Ok(())
 }
