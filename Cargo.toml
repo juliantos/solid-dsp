@@ -17,6 +17,7 @@ libm = "0.2.1"
 [lib]
 name = "solid"
 path = "src/mod.rs"
+crate-type = ["rlib", "dylib", "staticlib"]
 
 [profile.dev]
 opt-level = 0
