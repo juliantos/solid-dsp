@@ -199,7 +199,6 @@ pub fn bilinear_numerator_denominator(numerators: &[Complex<f64>], denominators:
 }
 
 
-// TODO: Bilinear Space-State Transforms
 
 /// Flips a digital low-pass filter to a digital high-pass filter or vice-versa
 /// 

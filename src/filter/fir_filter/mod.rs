@@ -37,10 +37,10 @@ pub struct FIRFilter<C, T> {
 }
 
 impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
-    /// Constructs a new, `FIRFilter<C>`
+    /// Constructs a new, `FIRFilter<C, T>`
     /// 
-    /// Uses the input which represents the discrete coeficients of type `C` 
-    /// to create the filter.
+    /// Uses the input which represents the discrete coefficients of type `C` 
+    /// to create the filter. Does work on type `T` elements.
     /// 
     /// # Example
     /// 

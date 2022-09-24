@@ -35,6 +35,19 @@ pub struct SecondOrderFilter<C, T> {
 }
 
 impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
+    /// Contructs a new `SecondOrderFilter<C, T>`
+    /// 
+    /// Coeffients are of type C and the data being passed in and out is of type T.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use solid::filter::iir_filter::second_order_filter::SecondOrderFilter;
+    /// use num::complex::Complex;
+    /// 
+    /// let (ff_coefs, fb_coefs) = solid::filter::iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
+    /// let mut second_order_filter = SecondOrderFilter::<f64, f64>::new(&ff_coefs, &fb_coefs).unwrap();
+    /// ```
     pub fn new(feed_forward: &[C], feed_back: &[C]) -> Result<Self, Box<dyn Error>> {
         if feed_forward.len() < 3 {
             return Err(Box::new(SecondOrderError(SecondOrderErrorCode::CoefficientsNotInRange)));
@@ -53,6 +66,21 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
         })
     }
 
+    /// Executes `T` or `Out` -> `Out` on a `SecondOrderFilter<C, T>`
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use solid::filter::iir_filter::second_order_filter::SecondOrderFilter;
+    /// use num::complex::Complex;
+    /// 
+    /// let (ff_coefs, fb_coefs) = solid::filter::iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
+    /// let mut second_order_filter = SecondOrderFilter::<f64, f64>::new(&ff_coefs, &fb_coefs).unwrap();
+    /// 
+    /// let output = second_order_filter.execute(either::Either::Right(1.0));
+    /// 
+    /// assert_eq!(output, 0.05816769596076701);
+    /// ```
     pub fn execute<Out>(&mut self, input: Either<T, Out>) -> Out
     where DotProduct<C>: Execute<T, Output=Out> ,
           T: Sub<Out, Output=T>,
@@ -78,11 +106,41 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
         numer_output
     }
     
+    /// Returns the Numerator Coefs that the second order filter is using
+    /// 
+    /// Example
+    /// 
+    /// ```
+    /// use solid::filter::iir_filter::second_order_filter::SecondOrderFilter;
+    /// use num::complex::Complex;
+    /// 
+    /// let (ff_coefs, fb_coefs) = solid::filter::iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
+    /// let second_order_filter = SecondOrderFilter::<f64, f64>::new(&ff_coefs, &fb_coefs).unwrap();
+    /// 
+    /// let numerators = second_order_filter.numerator_coefs();
+    /// assert_eq!(numerators.len(), 2);
+    /// assert_eq!(numerators[1], 0.99999840000128);
+    /// ```
     #[inline(always)]
     pub fn numerator_coefs(&self) -> &Vec<C> {
         self.numerator_coefs.coefficents()
     }
 
+    /// Returns the Denominator Coefs that the second order filter is using
+    /// 
+    /// Example
+    /// 
+    /// ```
+    /// use solid::filter::iir_filter::second_order_filter::SecondOrderFilter;
+    /// use num::complex::Complex;
+    /// 
+    /// let (ff_coefs, fb_coefs) = solid::filter::iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
+    /// let second_order_filter = SecondOrderFilter::<f64, f64>::new(&ff_coefs, &fb_coefs).unwrap();
+    /// 
+    /// let denominators = second_order_filter.denominator_coefs();
+    /// assert_eq!(denominators.len(), 3);
+    /// assert_eq!(denominators[1], 0.003199997440002048);
+    /// ```
     #[inline(always)]
     pub fn denominator_coefs(&self) -> &Vec<C> {
         self.denominator_coefs.coefficents()

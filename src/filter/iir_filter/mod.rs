@@ -49,6 +49,7 @@ impl fmt::Display for IIRError {
 
 impl Error for IIRError {}
 
+#[derive(PartialEq, Debug)]
 pub enum IIRFilterType {
     Normal,
     SecondOrder
@@ -63,6 +64,20 @@ pub struct IIRFilter<C, T> {
 }
 
 impl<C: Copy + Num + Sum, T: Copy> IIRFilter<C, T> {
+    /// Creates and IIR Filter with coeffients of type `C` and takes in data of type `T`
+    /// 
+    /// It should be noted that `T` and `C` are both numerican and can be multiplied and added together.
+    /// 
+    /// Example
+    /// 
+    /// ``` 
+    /// use solid::filter::iirdes;
+    /// use solid::filter::iir_filter::*;
+    /// use num::complex::Complex;
+    /// 
+    /// let filter = iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
+    /// let mut iir_filter = IIRFilter::<f64, Complex<f64>>::new(&filter.0, &filter.1, IIRFilterType::SecondOrder).unwrap();
+    /// ```
     pub fn new(feed_forward: &[C], feed_back: &[C], iirtype: IIRFilterType) -> Result<Self, Box<dyn Error>> {
         match iirtype {
             IIRFilterType::Normal => {
@@ -128,6 +143,24 @@ impl<C: Copy + Num + Sum, T: Copy> IIRFilter<C, T> {
 
     }
 
+    /// Executes type `T` and returns the data type `Out`
+    /// 
+    /// `Out` is whatever the data type results in the multiplication of `C` and `T`
+    /// 
+    /// Example
+    /// 
+    /// ``` 
+    /// use solid::filter::iirdes;
+    /// use solid::filter::iir_filter::*;
+    /// 
+    /// let filter = iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
+    /// let mut iir_filter = IIRFilter::new(&filter.0, &filter.1, IIRFilterType::SecondOrder).unwrap();
+    /// 
+    /// let output = iir_filter.execute(1f64);
+    /// 
+    /// assert_eq!(output, 0.05816769596076701);
+    /// 
+    /// ```
     pub fn execute<Out>(&mut self, input: T) -> Out 
     where DotProduct<C>: Execute<T, Output=Out>,
           T: Sub<Out, Output=T>,
@@ -154,6 +187,24 @@ impl<C: Copy + Num + Sum, T: Copy> IIRFilter<C, T> {
         }
     }
 
+    /// Executes array of type `T` and returns an array of the data type `Out`
+    /// 
+    /// `Out` is whatever the data type results in the multiplication of `C` and `T`
+    /// 
+    /// Example
+    /// 
+    /// ``` 
+    /// use solid::filter::iirdes;
+    /// use solid::filter::iir_filter::*;
+    /// 
+    /// let filter = iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
+    /// let mut iir_filter = IIRFilter::new(&filter.0, &filter.1, IIRFilterType::SecondOrder).unwrap();
+    /// 
+    /// let output = iir_filter.execute_block(&[1.0, 0.0, 1.0, 0.0, 1.0]);
+    /// 
+    /// assert_eq!(output, [0.05816769596076701, 0.119535296293297, 0.18410279587774706, 0.2518701895942824, 0.32283747232307686]);
+    /// 
+    /// ```
     pub fn execute_block<Out>(&mut self, samples: &[T]) -> Vec<Out>
     where DotProduct<C>: Execute<T, Output=Out>,
           T: Sub<Out, Output=T>,
@@ -165,22 +216,78 @@ impl<C: Copy + Num + Sum, T: Copy> IIRFilter<C, T> {
         }
         block
     }
-
+    /// Returns the Numerator Coefs that the second order filter is using
+    /// 
+    /// Example
+    /// 
+    /// ``` 
+    /// use solid::filter::iirdes;
+    /// use solid::filter::iir_filter::*;
+    /// 
+    /// let filter = iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
+    /// let mut iir_filter = IIRFilter::<f64, f64>::new(&filter.0, &filter.1, IIRFilterType::SecondOrder).unwrap();
+    /// 
+    /// let numerators = iir_filter.numerator_coefs();
+    /// 
+    /// assert_eq!(numerators.to_vec(),  filter.0);
+    /// ```
     #[inline(always)]
     pub fn numerator_coefs(&self) -> &Vec<C> {
         self.numerator_coefs.coefficents()
     }
 
+    /// Returns the Denominator Coefs that the second order filter is using
+    /// 
+    /// Example
+    /// 
+    /// ``` 
+    /// use solid::filter::iirdes;
+    /// use solid::filter::iir_filter::*;
+    /// 
+    /// let filter = iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
+    /// let mut iir_filter = IIRFilter::<f64, f64>::new(&filter.0, &filter.1, IIRFilterType::SecondOrder).unwrap();
+    /// 
+    /// let denominators = iir_filter.denominator_coefs();
+    /// 
+    /// assert_eq!(denominators.to_vec(),  filter.1);
+    /// ```
     #[inline(always)]
     pub fn denominator_coefs(&self) -> &Vec<C> {
         self.denominator_coefs.coefficents()
     }
 
+    /// Returns all the Second Order Internal Filters
+    /// 
+    /// Example
+    /// 
+    /// ``` 
+    /// use solid::filter::iirdes;
+    /// use solid::filter::iir_filter::*;
+    /// 
+    /// let filter = iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
+    /// let mut iir_filter = IIRFilter::<f64, f64>::new(&filter.0, &filter.1, IIRFilterType::SecondOrder).unwrap();
+    /// 
+    /// let filters = iir_filter.second_order_filters();
+    /// 
+    /// assert_eq!(filters.len(), 1);
+    /// ```
     #[inline(always)]
     pub fn second_order_filters(&self) -> &Vec<SecondOrderFilter<C, T>> {
         &self.second_order_sections
     }
 
+    /// Returns the IIR Type, Most times this should just be a second order filter
+    /// 
+    /// Example
+    /// 
+    /// ```
+    /// use solid::filter::iirdes;
+    /// use solid::filter::iir_filter::*;
+    /// 
+    /// let filter = iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
+    /// let mut iir_filter = IIRFilter::<f64, f64>::new(&filter.0, &filter.1, IIRFilterType::SecondOrder).unwrap();
+    /// assert_eq!(*iir_filter.iir_type(), IIRFilterType::SecondOrder);
+    /// ```
     #[inline(always)]
     pub fn iir_type(&self) -> &IIRFilterType {
         &self.iirtype
