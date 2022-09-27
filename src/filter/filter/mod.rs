@@ -28,7 +28,7 @@ pub trait Filter<C> {
     ///     Ok(coefs) => coefs,
     ///     _ => vec!()
     /// };
-    /// let filter = FIRFilter::<f64, f64>::new(&coefs, 1.0);
+    /// let filter = FIRFilter::<f64, f64>::new(&coefs, 1.0).unwrap();
     /// let response = Filter::frequency_response(&filter, 0.0);
     /// 
     /// assert_eq!(response.re.round(), 1.0);
@@ -49,7 +49,7 @@ pub trait Filter<C> {
     ///     Ok(coefs) => coefs,
     ///     _ => vec!()
     /// };
-    /// let filter = FIRFilter::<f64, f64>::new(&coefs, 1.0);
+    /// let filter = FIRFilter::<f64, f64>::new(&coefs, 1.0).unwrap();
     /// let delay = Filter::group_delay(&filter, 0.0);
     /// 
     /// assert_eq!((delay + 0.5) as usize, 12);
