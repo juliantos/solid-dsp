@@ -3,19 +3,19 @@
 static MAX_FACTORS: usize = 64;
 
 /// Gets the leading index bit location
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use solid::resources::msb_index;
 /// let value = 0b1;
 /// let index = msb_index(value);
 /// assert_eq!(index, 1);
-/// 
+///
 /// let value = 129;
 /// let index = msb_index(value);
 /// assert_eq!(index, 8);
-/// 
+///
 /// ```
 #[inline(always)]
 pub fn msb_index(x: usize) -> usize {
@@ -23,15 +23,15 @@ pub fn msb_index(x: usize) -> usize {
 }
 
 /// Gets the factors of the number
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use solid::resources::factor;
 /// let value = 12;
-/// let factors = factor(value);
-/// 
-/// assert_eq!(factors, vec![2, 3, 2])
+/// let mut factors = factor(value);
+/// factors.sort();
+/// assert_eq!(factors, vec![2, 2, 3])
 /// ```
 #[inline(always)]
 pub fn factor(number_to_factor: usize) -> Vec<usize> {
@@ -42,6 +42,7 @@ pub fn factor(number_to_factor: usize) -> Vec<usize> {
             if n % i == 0 {
                 factors.push(i);
                 n /= i;
+                break;
             }
         }
     }
@@ -50,16 +51,16 @@ pub fn factor(number_to_factor: usize) -> Vec<usize> {
 }
 
 /// Computes (Base ^ Exponent) % Modulo
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use solid::resources::modpow;
 /// let base = 5;
 /// let exp = 5;
 /// let n = 3;
 /// let c = modpow(base, exp, n);
-/// 
+///
 /// assert_eq!(c, 2);
 /// ```
 pub fn modpow(base: usize, exp: usize, n: usize) -> usize {
@@ -72,14 +73,14 @@ pub fn modpow(base: usize, exp: usize, n: usize) -> usize {
 }
 
 /// Gets the Primitive Prime Root of a number
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use solid::resources::primitive_root_prime;
 /// let value = 43;
 /// let prime = primitive_root_prime(value);
-/// 
+///
 /// assert_eq!(prime, 3);
 /// ```
 pub fn primitive_root_prime(n: usize) -> usize {
@@ -88,11 +89,11 @@ pub fn primitive_root_prime(n: usize) -> usize {
     while n_ > 1 && factors.len() < MAX_FACTORS {
         for k in 2..=n_ {
             if n_ % k == 0 {
+                if factors.iter().find(|&&x| x == k) == None {
+                    factors.push(k)
+                }
                 n_ /= k;
-                match factors.iter().find(|&&x| x == k) {
-                    None => factors.push(k),
-                    _ => ()
-                };
+                break;
             }
         }
     }
@@ -101,18 +102,17 @@ pub fn primitive_root_prime(n: usize) -> usize {
     for g in 2..n {
         h = g;
         let mut is_root = true;
-        for k in 0..factors.len() {
-            let e = (n - 1) / factors[k];
+        for item in &factors {
+            let e = (n - 1) / item;
             if modpow(g, e, n) == 1 {
                 is_root = false;
                 break;
             }
         }
-        
+
         if is_root {
             break;
         }
-
     }
 
     h

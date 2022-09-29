@@ -1,11 +1,11 @@
 use super::super::group_delay::*;
-use super::super::math::complex::{Real, Conj};
+use super::super::math::complex::{Conj, Real};
 use super::fir_filter::FIRFilter;
-use super::iir_filter::{IIRFilter, IIRFilterType};
 use super::iir_filter::second_order_filter::SecondOrderFilter;
+use super::iir_filter::{IIRFilter, IIRFilterType};
 
-use std::ops::{Mul, Add, Neg};
 use std::iter::Sum;
+use std::ops::{Add, AddAssign, Mul, Neg};
 
 use num::complex::Complex;
 use num_traits::Num;
@@ -15,55 +15,57 @@ pub trait Filter<C> {
     type Complex;
 
     /// Computes the Complex Frequency response of the filter
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use solid::filter::fir_filter::FIRFilter;
-    /// use solid::filter::filter::Filter;
+    /// use solid::filter::filter_traits::Filter;
     /// use solid::filter::firdes::*;
     /// use num::complex::Complex;
-    /// 
+    ///
     /// let coefs = match firdes_notch(25, 0.35, 120.0) {
     ///     Ok(coefs) => coefs,
     ///     _ => vec!()
     /// };
     /// let filter = FIRFilter::<f64, f64>::new(&coefs, 1.0).unwrap();
     /// let response = Filter::frequency_response(&filter, 0.0);
-    /// 
+    ///
     /// assert_eq!(response.re.round(), 1.0);
     /// assert_eq!(response.im, 0.0);
     /// ```
     fn frequency_response(&self, frequency: Self::Float) -> Self::Complex;
 
     /// Computes the group delay in samples
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use solid::filter::fir_filter::FIRFilter;
-    /// use solid::filter::filter::Filter;
+    /// use solid::filter::filter_traits::Filter;
     /// use solid::filter::firdes;
-    /// 
+    ///
     /// let coefs = match firdes::firdes_notch(12, 0.35, 120.0) {
     ///     Ok(coefs) => coefs,
     ///     _ => vec!()
     /// };
     /// let filter = FIRFilter::<f64, f64>::new(&coefs, 1.0).unwrap();
     /// let delay = Filter::group_delay(&filter, 0.0);
-    /// 
+    ///
     /// assert_eq!((delay + 0.5) as usize, 12);
     /// ```
     fn group_delay(&self, frequency: Self::Float) -> f64;
 }
 
 /// Implementation where the Coefficients are not a Complex Type
-impl<C: Num + Copy + Sum, T: Copy> Filter<C> for FIRFilter<C, T> 
-where Complex<C>: Sum<Complex<C>>,
-      Complex<C>: Add<Complex<f64>, Output=Complex<C>>,
-      C: Mul<f64, Output=f64>,
-      C: Mul<Complex<f64>, Output=Complex<f64>>,
-      C: PartialOrd<f64> 
+impl<C: Num + Copy + Sum, T: Copy> Filter<C> for FIRFilter<C, T>
+where
+    Complex<C>: Sum<Complex<C>>,
+    Complex<C>: Add<Complex<f64>, Output = Complex<C>>,
+    Complex<C>: AddAssign<Complex<f64>>,
+    C: Mul<f64, Output = f64>,
+    C: Mul<Complex<f64>, Output = Complex<f64>>,
+    C: PartialOrd<f64>,
 {
     type Float = C;
     type Complex = Complex<C>;
@@ -72,14 +74,18 @@ where Complex<C>: Sum<Complex<C>>,
         let mut output: Self::Complex = Complex::new(Self::Float::zero(), Self::Float::zero());
 
         let coefs = self.coefficients();
-        for i in 0..coefs.len() {
-            let out = coefs[i] * Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
-            output = output + out;
+        for (i, coef) in coefs.iter().enumerate() {
+            let out = *coef
+                * Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
+            output += out;
         }
         output * self.get_scale()
     }
 
-    fn group_delay(&self, frequency: Self::Float) -> f64 where C: PartialOrd<f64> {
+    fn group_delay(&self, frequency: Self::Float) -> f64
+    where
+        C: PartialOrd<f64>,
+    {
         match fir_group_delay(self.coefficients(), frequency) {
             Ok(delay) => delay,
             Err(e) => {
@@ -92,26 +98,28 @@ where Complex<C>: Sum<Complex<C>>,
     }
 }
 
-
 /// Implementation where Coefficients are Complex Type
-impl<C: Num + Copy + Sum, T: Copy> Filter<C> for FIRFilter<Complex<C>, T> 
-where Complex<C>: Sum<Complex<C>>,
-      Complex<C>: Mul<Complex<f64>, Output=Complex<f64>>,
-      Complex<C>: Mul<f64, Output=Complex<C>>,
-      Complex<C>: Add<Complex<f64>, Output=Complex<C>>,
-      C: Mul<f64, Output=f64>,
-      C: PartialOrd<f64>
+impl<C: Num + Copy + Sum, T: Copy> Filter<C> for FIRFilter<Complex<C>, T>
+where
+    Complex<C>: Sum<Complex<C>>,
+    Complex<C>: Mul<Complex<f64>, Output = Complex<f64>>,
+    Complex<C>: Mul<f64, Output = Complex<C>>,
+    Complex<C>: Add<Complex<f64>, Output = Complex<C>>,
+    Complex<C>: AddAssign<Complex<f64>>,
+    C: Mul<f64, Output = f64>,
+    C: PartialOrd<f64>,
 {
     type Float = C;
     type Complex = Complex<C>;
 
     fn frequency_response(&self, frequency: Self::Float) -> Self::Complex {
         let mut output: Self::Complex = Complex::new(Self::Float::zero(), Self::Float::zero());
-        
+
         let coefs = self.coefficients();
-        for i in 0..coefs.len() {
-            let out = coefs[i] * Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
-            output = output + out;
+        for (i, coef) in coefs.iter().enumerate() {
+            let out = *coef
+                * Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
+            output += out;
         }
 
         output * self.get_scale()
@@ -131,12 +139,13 @@ where Complex<C>: Sum<Complex<C>>,
 }
 
 impl<C: Num + Copy + Sum, T: Copy> Filter<C> for SecondOrderFilter<C, T>
-where Complex<C>: Add<Complex<f64>, Output=Complex<C>>,
-      C: Mul<f64, Output=f64>,
-      C: Mul<Complex<f64>, Output=Complex<f64>>,
-      C: Real<Output=C>,
-      C: PartialOrd<f64>,
-      C: Conj<Output=C>
+where
+    Complex<C>: Add<Complex<f64>, Output = Complex<C>>,
+    C: Mul<f64, Output = f64>,
+    C: Mul<Complex<f64>, Output = Complex<f64>>,
+    C: Real<Output = C>,
+    C: PartialOrd<f64>,
+    C: Conj<Output = C>,
 {
     type Float = C;
     type Complex = Complex<C>;
@@ -148,7 +157,8 @@ where Complex<C>: Add<Complex<f64>, Output=Complex<C>>,
         let coefs_b = self.numerator_coefs();
         let coefs_a = self.denominator_coefs();
         for i in 0..3 {
-            let polar = Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
+            let polar =
+                Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
             if i < 2 {
                 let out_b = coefs_b[i] * polar;
                 output_b = output_b + out_b;
@@ -186,13 +196,14 @@ where Complex<C>: Add<Complex<f64>, Output=Complex<C>>,
 }
 
 impl<C: Num + Copy + Sum, T: Copy> Filter<C> for SecondOrderFilter<Complex<C>, T>
-where Complex<C>: Add<Complex<f64>, Output=Complex<C>>,
-      Complex<C>: Mul<Complex<f64>, Output=Complex<f64>>,
-      C: Mul<Complex<f64>, Output=Complex<f64>>,
-      C: Mul<f64, Output=f64>,
-      C: Real<Output=C>,
-      C: PartialOrd<f64>,
-      C: Conj<Output=C>
+where
+    Complex<C>: Add<Complex<f64>, Output = Complex<C>>,
+    Complex<C>: Mul<Complex<f64>, Output = Complex<f64>>,
+    C: Mul<Complex<f64>, Output = Complex<f64>>,
+    C: Mul<f64, Output = f64>,
+    C: Real<Output = C>,
+    C: PartialOrd<f64>,
+    C: Conj<Output = C>,
 {
     type Float = C;
     type Complex = Complex<C>;
@@ -204,7 +215,8 @@ where Complex<C>: Add<Complex<f64>, Output=Complex<C>>,
         let coefs_b = self.numerator_coefs();
         let coefs_a = self.denominator_coefs();
         for i in 0..3 {
-            let polar = Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64)); 
+            let polar =
+                Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
             let out_b = coefs_b[i] * polar;
             let out_a = coefs_a[i] * polar;
             output_b = output_b + out_b;
@@ -235,13 +247,14 @@ where Complex<C>: Add<Complex<f64>, Output=Complex<C>>,
     }
 }
 
-impl<C: Num + Copy + Sum, T: Copy> Filter<C> for IIRFilter<C, T> 
-where Complex<C>: Add<Complex<f64>, Output=Complex<C>>,
-      C: Mul<f64, Output=f64>,
-      C: Mul<Complex<f64>, Output=Complex<f64>>,
-      C: Real<Output=C>,
-      C: PartialOrd<f64>,
-      C: Conj<Output=C>
+impl<C: Num + Copy + Sum, T: Copy> Filter<C> for IIRFilter<C, T>
+where
+    Complex<C>: Add<Complex<f64>, Output = Complex<C>>,
+    C: Mul<f64, Output = f64>,
+    C: Mul<Complex<f64>, Output = Complex<f64>>,
+    C: Real<Output = C>,
+    C: PartialOrd<f64>,
+    C: Conj<Output = C>,
 {
     type Float = C;
     type Complex = Complex<C>;
@@ -253,12 +266,20 @@ where Complex<C>: Add<Complex<f64>, Output=Complex<C>>,
                 let mut a = Complex::new(Self::Float::zero(), Self::Float::zero());
 
                 for (i, &coef) in self.numerator_coefs().iter().enumerate() {
-                    let exp = coef * Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
+                    let exp = coef
+                        * Complex::from_polar(
+                            1.0,
+                            frequency * 2.0 * std::f64::consts::PI * (i as f64),
+                        );
                     b = b + exp;
                 }
 
                 for (i, &coef) in self.denominator_coefs().iter().enumerate() {
-                    let exp = coef * Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
+                    let exp = coef
+                        * Complex::from_polar(
+                            1.0,
+                            frequency * 2.0 * std::f64::consts::PI * (i as f64),
+                        );
                     a = a + exp;
                 }
 
@@ -301,15 +322,16 @@ where Complex<C>: Add<Complex<f64>, Output=Complex<C>>,
 }
 
 impl<C: Num + Copy + Sum, T: Copy> Filter<C> for IIRFilter<Complex<C>, T>
-where Complex<C>: Add<Complex<f64>, Output=Complex<C>>,
-      Complex<C>: Mul<Complex<f64>, Output=Complex<f64>>,
-      Complex<C>: Mul<Complex<C>, Output=Complex<C>>,
-      C: Mul<Complex<f64>, Output=Complex<f64>>,
-      C: Mul<f64, Output=f64>,
-      C: Real<Output=C>,
-      C: PartialOrd<f64>,
-      C: Conj<Output=C>,
-      C: Neg<Output=C>
+where
+    Complex<C>: Add<Complex<f64>, Output = Complex<C>>,
+    Complex<C>: Mul<Complex<f64>, Output = Complex<f64>>,
+    Complex<C>: Mul<Complex<C>, Output = Complex<C>>,
+    C: Mul<Complex<f64>, Output = Complex<f64>>,
+    C: Mul<f64, Output = f64>,
+    C: Real<Output = C>,
+    C: PartialOrd<f64>,
+    C: Conj<Output = C>,
+    C: Neg<Output = C>,
 {
     type Float = C;
     type Complex = Complex<C>;
@@ -321,12 +343,20 @@ where Complex<C>: Add<Complex<f64>, Output=Complex<C>>,
                 let mut a = Complex::new(Self::Float::zero(), Self::Float::zero());
 
                 for (i, &coef) in self.numerator_coefs().iter().enumerate() {
-                    let exp = coef * Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
+                    let exp = coef
+                        * Complex::from_polar(
+                            1.0,
+                            frequency * 2.0 * std::f64::consts::PI * (i as f64),
+                        );
                     b = b + exp;
                 }
 
                 for (i, &coef) in self.denominator_coefs().iter().enumerate() {
-                    let exp = coef * Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
+                    let exp = coef
+                        * Complex::from_polar(
+                            1.0,
+                            frequency * 2.0 * std::f64::consts::PI * (i as f64),
+                        );
                     a = a + exp;
                 }
 

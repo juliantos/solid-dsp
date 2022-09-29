@@ -1,4 +1,4 @@
-use super::super::fft::{FFT, FFTDirection, FFTFlags, FFTType, FFTMethod, DataUnion, Rader2};
+use super::super::fft::{DataUnion, FFTDirection, FFTFlags, FFTMethod, FFTType, Rader2, FFT};
 use super::super::resources::{modpow, primitive_root_prime};
 
 use std::mem::ManuallyDrop;
@@ -14,43 +14,60 @@ pub fn create_rader2_plan(nfft: usize, direction: FFTDirection, flags: FFTFlags)
 
     let mut nfft_prime = (2 * nfft - 4) - 1;
     let mut m = 0;
-    while nfft_prime > 0 { 
+    while nfft_prime > 0 {
         nfft_prime >>= 1;
         m += 1;
     }
     nfft_prime = 1 << m;
 
-    let d = if direction == FFTDirection::FORWARD { -1.0 } else { 1.0 };
+    let d = if direction == FFTDirection::FORWARD {
+        -1.0
+    } else {
+        1.0
+    };
     let mut time_domain_buffer = Vec::new();
     for i in 0..(nfft_prime) {
-        let exponent = Complex::from_polar(1.0, d * 2.0 * std::f64::consts::PI * (seq[i % (nfft - 1)] as f64) / (nfft as f64));
+        let exponent = Complex::from_polar(
+            1.0,
+            d * 2.0 * std::f64::consts::PI * (seq[i % (nfft - 1)] as f64) / (nfft as f64),
+        );
         time_domain_buffer.push(exponent)
     }
 
     let fft = FFT::new(nfft_prime, FFTDirection::FORWARD, flags);
     let ifft = FFT::new(nfft_prime, FFTDirection::REVERSE, flags);
 
-    let freq_domain_buffer = fft.execute(&time_domain_buffer).unwrap_or(vec![]);
+    let freq_domain_buffer = fft.execute(&time_domain_buffer).unwrap_or_default();
 
     FFT {
-        nfft: nfft,
-        fft_type: if direction == FFTDirection::FORWARD { FFTType::FORWARD } else { FFTType::REVERSE },
+        nfft,
+        fft_type: if direction == FFTDirection::FORWARD {
+            FFTType::FORWARD
+        } else {
+            FFTType::REVERSE
+        },
         fft_direction: direction,
         fft_method: FFTMethod::RADER2,
         fft_flags: flags,
-        data: DataUnion { rader2: ManuallyDrop::new(Rader2 {
-            seq: seq,
-            nfft_prime: nfft_prime,
-            dft: freq_domain_buffer,
-            fft: Box::new(fft),
-            ifft: Box::new(ifft),
-            execute_function: rader2_execute
-        })}
+        data: DataUnion {
+            rader2: ManuallyDrop::new(Rader2 {
+                seq,
+                nfft_prime,
+                dft: freq_domain_buffer,
+                fft: Box::new(fft),
+                ifft: Box::new(ifft),
+                execute_function: rader2_execute,
+            }),
+        },
     }
 }
 
-pub fn rader2_execute(fft: &FFT, input: &[Complex<f64>]) -> Result<Vec<Complex<f64>>, Box<dyn std::error::Error>> {
+pub fn rader2_execute(
+    fft: &FFT,
+    input: &[Complex<f64>],
+) -> Result<Vec<Complex<f64>>, Box<dyn std::error::Error>> {
     let mut output = Vec::with_capacity(fft.nfft);
+    let _remaining = output.spare_capacity_mut();
     unsafe { output.set_len(fft.nfft) };
 
     let nfft_prime = unsafe { fft.data.rader2.nfft_prime };
@@ -60,14 +77,19 @@ pub fn rader2_execute(fft: &FFT, input: &[Complex<f64>]) -> Result<Vec<Complex<f
 
     x_prime[0] = input[seq[fft.nfft - 2]];
     for i in 1..(fft.nfft - 1) {
-        let k = seq[fft.nfft - i -2];
+        let k = seq[fft.nfft - i - 2];
         x_prime[i + nfft_prime - fft.nfft + 1] = input[k];
     }
 
-
     let mut xi_prime = unsafe { fft.data.rader2.fft.execute(&x_prime)? };
 
-    xi_prime = unsafe { xi_prime.iter().zip(fft.data.rader2.dft.iter()).map(|(&x, &y)| x * y).collect() };
+    xi_prime = unsafe {
+        xi_prime
+            .iter()
+            .zip(fft.data.rader2.dft.iter())
+            .map(|(&x, &y)| x * y)
+            .collect()
+    };
 
     x_prime = unsafe { fft.data.rader2.ifft.execute(&xi_prime)? };
 

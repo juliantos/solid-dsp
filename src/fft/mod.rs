@@ -1,25 +1,25 @@
-pub mod radix2;
 pub mod dft;
 pub mod mixed_radix;
 pub mod rader;
 pub mod rader2;
+pub mod radix2;
 
 use super::dot_product::DotProduct;
 
+use std::error::Error;
 use std::fmt;
 use std::mem::ManuallyDrop;
-use std::error::Error;
 
 use num::complex::Complex;
 use slow_primes::is_prime_miller_rabin;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum FFTDirection {
     FORWARD,
-    REVERSE
+    REVERSE,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum FFTType {
     DEFAULT,
     FORWARD,
@@ -33,10 +33,10 @@ pub enum FFTType {
     RODFT10,
     RODFT11,
     MDCT,
-    IMDCT
+    IMDCT,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum FFTMethod {
     DEFAULT,
     RADIX2,
@@ -44,22 +44,23 @@ pub enum FFTMethod {
     RADER,
     RADER2,
     DFT,
-    UNKNOWN
+    UNKNOWN,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum FFTFlags {
     ESTIMATE,
-    MEASURE
+    MEASURE,
 }
 
-type FFTExecuteFunction = fn(&FFT, input: &[Complex<f64>]) -> Result<Vec<Complex<f64>>, Box<dyn Error>>;
+type FFTExecuteFunction =
+    fn(&FFT, input: &[Complex<f64>]) -> Result<Vec<Complex<f64>>, Box<dyn Error>>;
 
-struct DFT {
+struct Dft {
     #[allow(dead_code)]
     twiddle: Vec<Complex<f64>>,
     dot_products: Vec<DotProduct<Complex<f64>>>,
-    execute_function: FFTExecuteFunction
+    execute_function: FFTExecuteFunction,
 }
 
 struct Radix2 {
@@ -67,7 +68,7 @@ struct Radix2 {
     reverse_indexes: Vec<usize>,
     m: usize,
     log2: bool,
-    execute_function: FFTExecuteFunction
+    execute_function: FFTExecuteFunction,
 }
 
 struct MixedRadix {
@@ -76,7 +77,7 @@ struct MixedRadix {
     twiddle: Vec<Complex<f64>>,
     p_fft: Box<FFT>,
     q_fft: Box<FFT>,
-    execute_function: FFTExecuteFunction
+    execute_function: FFTExecuteFunction,
 }
 
 struct Rader {
@@ -84,7 +85,7 @@ struct Rader {
     dft: Vec<Complex<f64>>,
     fft: Box<FFT>,
     ifft: Box<FFT>,
-    execute_function: FFTExecuteFunction
+    execute_function: FFTExecuteFunction,
 }
 
 struct Rader2 {
@@ -93,15 +94,15 @@ struct Rader2 {
     dft: Vec<Complex<f64>>,
     fft: Box<FFT>,
     ifft: Box<FFT>,
-    execute_function: FFTExecuteFunction
+    execute_function: FFTExecuteFunction,
 }
 
 union DataUnion {
-    dft: ManuallyDrop<DFT>,
+    dft: ManuallyDrop<Dft>,
     radix2: ManuallyDrop<Radix2>,
     mixed_radix: ManuallyDrop<MixedRadix>,
     rader: ManuallyDrop<Rader>,
-    rader2: ManuallyDrop<Rader2>
+    rader2: ManuallyDrop<Rader2>,
 }
 
 fn fft_is_radix2(nfft: usize) -> bool {
@@ -129,7 +130,7 @@ fn fft_estimate_method(nfft: usize) -> FFTMethod {
     } else if fft_is_radix2(nfft) {
         method = FFTMethod::MIXEDRADIX
     } else if is_prime_miller_rabin(nfft as u64) {
-        if fft_is_radix2(nfft-1) {
+        if fft_is_radix2(nfft - 1) {
             method = FFTMethod::RADER
         } else {
             method = FFTMethod::RADER2
@@ -145,18 +146,15 @@ fn fft_estimate_method(nfft: usize) -> FFTMethod {
 enum FFTErrorCode {
     NotEnoughBuffer,
     RadixFFTNotMultipleOf2,
-    BadExecuteMethod
+    BadExecuteMethod,
 }
 
 #[derive(Debug)]
-pub struct FFTError ( FFTErrorCode );
-
+pub struct FFTError(FFTErrorCode);
 
 impl fmt::Display for FFTError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &self.0 {
-            error => write!(f, "FFT Error: {:?}", error)
-        }
+        write!(f, "FFT Error: {:?}", self.0)
     }
 }
 
@@ -169,9 +167,8 @@ pub struct FFT {
     fft_type: FFTType,
     fft_method: FFTMethod,
     fft_flags: FFTFlags,
-    data: DataUnion
+    data: DataUnion,
 }
-
 
 // TODO[epic=fast]  Add Option for FFTW3 Bingings
 impl FFT {
@@ -179,55 +176,39 @@ impl FFT {
         let method = fft_estimate_method(nfft);
 
         match method {
-            FFTMethod::RADIX2 => {
-                radix2::create_radix2_fft_plan(nfft, direction, flags)
-            }
-            FFTMethod::DFT => {
-                dft::create_dft_plan(nfft, direction, flags)
-            }
-            FFTMethod::MIXEDRADIX => {
-                mixed_radix::create_mixed_radix_plan(nfft, direction, flags)
-            }
-            FFTMethod::RADER => {
-                rader::create_rader_plan(nfft, direction, flags)
-            }
-            FFTMethod::RADER2 => {
-                rader2::create_rader2_plan(nfft, direction, flags)
-            }
-            _ => {
-                mixed_radix::create_mixed_radix_plan(nfft, direction, flags)
-            }
+            FFTMethod::RADIX2 => radix2::create_radix2_fft_plan(nfft, direction, flags),
+            FFTMethod::DFT => dft::create_dft_plan(nfft, direction, flags),
+            FFTMethod::MIXEDRADIX => mixed_radix::create_mixed_radix_plan(nfft, direction, flags),
+            FFTMethod::RADER => rader::create_rader_plan(nfft, direction, flags),
+            FFTMethod::RADER2 => rader2::create_rader2_plan(nfft, direction, flags),
+            _ => mixed_radix::create_mixed_radix_plan(nfft, direction, flags),
         }
     }
 
     pub fn execute(&self, input: &[Complex<f64>]) -> Result<Vec<Complex<f64>>, Box<dyn Error>> {
-        let output;
-
-        match self.fft_method {
+        let output = match self.fft_method {
             FFTMethod::RADIX2 => {
                 let execute_fn = unsafe { self.data.radix2.execute_function };
-                output = execute_fn(self, input)?
+                execute_fn(self, input)?
             }
             FFTMethod::DFT => {
                 let execute_fn = unsafe { self.data.dft.execute_function };
-                output = execute_fn(self, input)?
+                execute_fn(self, input)?
             }
             FFTMethod::MIXEDRADIX => {
                 let execute_fn = unsafe { self.data.mixed_radix.execute_function };
-                output = execute_fn(self, input)?
+                execute_fn(self, input)?
             }
             FFTMethod::RADER => {
                 let execute_fn = unsafe { self.data.rader.execute_function };
-                output = execute_fn(self, input)?
+                execute_fn(self, input)?
             }
             FFTMethod::RADER2 => {
                 let execute_fn = unsafe { self.data.rader2.execute_function };
-                output = execute_fn(self, input)?
+                execute_fn(self, input)?
             }
-            _ => {
-                return Err(Box::new(FFTError(FFTErrorCode::BadExecuteMethod)))
-            }
-        }
+            _ => return Err(Box::new(FFTError(FFTErrorCode::BadExecuteMethod))),
+        };
 
         Ok(output)
     }
@@ -235,28 +216,36 @@ impl FFT {
 
 impl fmt::Display for FFT {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "FFT Plan [{:?}] [n={}] [{:?}] [type={:?}]", self.fft_direction, self.nfft, self.fft_method, self.fft_type)?;
-        let result = match self.fft_method {
+        write!(
+            f,
+            "FFT Plan [{:?}] [n={}] [{:?}] [type={:?}]",
+            self.fft_direction, self.nfft, self.fft_method, self.fft_type
+        )?;
+        match self.fft_method {
             FFTMethod::MIXEDRADIX => {
-                unsafe { writeln!(f, " [P={}, Q={}]", self.data.mixed_radix.p, self.data.mixed_radix.q)? };
+                unsafe {
+                    writeln!(
+                        f,
+                        " [P={}, Q={}]",
+                        self.data.mixed_radix.p, self.data.mixed_radix.q
+                    )?
+                };
                 unsafe { write!(f, "PFFT:{}", self.data.mixed_radix.p_fft)? };
                 unsafe { write!(f, "QFFT:{}", self.data.mixed_radix.q_fft) }
             }
             FFTMethod::RADER => {
-                writeln!(f, "")?;
+                writeln!(f)?;
                 unsafe { write!(f, "FFT:{}", self.data.rader.fft)? };
-                unsafe { write!(f, "IFFT:{}", self.data.rader.ifft) } 
+                unsafe { write!(f, "IFFT:{}", self.data.rader.ifft) }
             }
             FFTMethod::RADER2 => {
                 unsafe { writeln!(f, "[Prime={}]", self.data.rader2.nfft_prime)? };
                 unsafe { write!(f, "FFT:{}", self.data.rader2.fft)? };
-                unsafe { write!(f, "IFFT:{}", self.data.rader2.ifft) } 
+                unsafe { write!(f, "IFFT:{}", self.data.rader2.ifft) }
             }
             _ => {
-                writeln!(f, "")
+                writeln!(f)
             }
-        };
-
-        result
+        }
     }
 }

@@ -1,17 +1,17 @@
-//! Triangular window 
+//! Triangular window
 use super::{WindowError, WindowErrorCode};
 
 use std::error::Error;
 
 /// Function to calculate the value of the tap at `index` of `window_length`
-/// 
+///
 /// Uses the Triangular formula to generate taps in the window
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use solid::windows::triangular;
-/// 
+///
 /// let window_len = 25;
 /// let mut h = vec![0.0; 25];
 /// let n = 26;
@@ -22,7 +22,7 @@ use std::error::Error;
 ///     };
 ///     assert_ne!(h[i], 0.0);
 /// }
-/// 
+///
 /// ```
 pub fn triangular(index: usize, window_length: usize, n: usize) -> Result<f64, Box<dyn Error>> {
     if index > window_length {

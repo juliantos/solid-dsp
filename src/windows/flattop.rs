@@ -4,14 +4,14 @@ use super::{WindowError, WindowErrorCode};
 use std::error::Error;
 
 /// Function to calculate the value of the tap at `index` of `window_length`
-/// 
+///
 /// Uses the flat top algorithm to generate taps in a window.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use solid::windows::flattop;
-/// 
+///
 /// let window_len = 25;
 /// let mut h = vec![0.0; 25];
 /// for i in 0..window_len {
@@ -21,11 +21,11 @@ use std::error::Error;
 ///     };
 ///     assert_ne!(h[i], 0.0);
 /// }
-/// 
+///
 /// ```
 pub fn flattop(index: usize, window_length: usize) -> Result<f64, Box<dyn Error>> {
     if index > window_length {
-        return Err(Box::new(WindowError(WindowErrorCode::OutOfBounds)))
+        return Err(Box::new(WindowError(WindowErrorCode::OutOfBounds)));
     }
 
     let a0: f64 = 1.000;

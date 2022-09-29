@@ -18,7 +18,9 @@ impl Sinc<f64> for f64 {
     #[inline]
     fn sinc(&self) -> f64 {
         if self.abs() < 0.01 {
-            return (PI_64 * self / 2.0).cos() * (PI_64 * self / 4.0).cos() * (PI_64 * self / 8.0).cos()
+            return (PI_64 * self / 2.0).cos()
+                * (PI_64 * self / 4.0).cos()
+                * (PI_64 * self / 8.0).cos();
         }
         (PI_64 * self).sin() / (PI_64 * self)
     }
@@ -29,7 +31,7 @@ pub trait Bessel<T> {
     fn besseli(self, nu: T) -> T;
 
     /// Log( Bessel ) Function
-    fn lnbesseli(self, nu: T) -> T; 
+    fn lnbesseli(self, nu: T) -> T;
 
     // Bessel Function of the first kind
     fn besselj(self, nu: T) -> T;
@@ -40,31 +42,31 @@ impl Bessel<f64> for f64 {
         // Special case self == 0
         if self == 0.0 {
             if nu == 0.0 {
-                return 1.0
+                return 1.0;
             } else {
-                return 0.0
+                return 0.0;
             }
         }
 
         // Special case nu == 1/2
         if nu == 0.5 {
-            return (2.0 / (PI_64 * self)).sqrt() * self.sinh()
-        } 
+            return (2.0 / (PI_64 * self)).sqrt() * self.sinh();
+        }
 
         // Low signal approximation
         if self < 0.001 * (nu + 1.0).sqrt() {
-            return (0.5 * self).powf(nu) / (nu + 1.0).gamma()
+            return (0.5 * self).powf(nu) / (nu + 1.0).gamma();
         }
 
         // Otherwise derive from log expression
-        self. lnbesseli(nu).exp()
+        self.lnbesseli(nu).exp()
     }
 
     fn lnbesseli(self, nu: f64) -> f64 {
         // Special case self == 0
         if self == 0.0 {
-            if nu == 0.0  {
-                return 0.0
+            if nu == 0.0 {
+                return 0.0;
             } else {
                 return -f64::MAX;
             }
@@ -72,12 +74,12 @@ impl Bessel<f64> for f64 {
 
         // Special case nu == 1/2
         if nu == 0.5 {
-            return 0.5 * (2.0 / (PI_64 * self)).ln() + self.sinh().ln()
+            return 0.5 * (2.0 / (PI_64 * self)).ln() + self.sinh().ln();
         }
 
         // Low Signal Approximation
         if self < 0.001 * (nu + 1.0).sqrt() {
-            return - (nu + 1.0).gamma() + nu * (0.5 * self).ln()
+            return -(nu + 1.0).gamma() + nu * (0.5 * self).ln();
         }
 
         // Otherwise
@@ -93,7 +95,7 @@ impl Bessel<f64> for f64 {
             // accumulate y
             y += (t1 - t2 - t3).exp();
         }
-        
+
         t0 + y.ln()
     }
 
@@ -101,14 +103,14 @@ impl Bessel<f64> for f64 {
         // Special case self == 0
         if self == 0.0 {
             if nu == 0.0 {
-                return 1.0
+                return 1.0;
             } else {
-                return 0.0
+                return 0.0;
             }
         }
 
         if self < 0.001 * (nu + 1.0).sqrt() {
-            return (0.5 * self).powf(nu) / (nu + 1.0).gamma()
+            return (0.5 * self).powf(nu) / (nu + 1.0).gamma();
         }
 
         #[allow(non_snake_case)]
@@ -144,7 +146,7 @@ impl Bessel<f64> for f64 {
 }
 
 pub trait Gamma<T> {
-    /// Gamma Function 
+    /// Gamma Function
     fn gamma(self) -> T;
     /// Log( Gamma ) Function
     fn lngamma(self) -> T;
@@ -156,13 +158,11 @@ impl Gamma<f64> for f64 {
             let t0 = (1.0 - self).gamma();
             let t1 = (PI_64 * self).sin();
 
-            if t0 == 0.0 || t1 == 0.0 {
-                if cfg!(debug_assertion) {
-                    panic!("Gamma Divides By Zero");
-                }
+            if (t0 == 0.0 || t1 == 0.0) && cfg!(debug_assertion) {
+                panic!("Gamma Divides By Zero");
             }
 
-            return PI_64 / (t0 * t1)
+            PI_64 / (t0 * t1)
         } else {
             self.lngamma().exp()
         }
@@ -173,13 +173,12 @@ impl Gamma<f64> for f64 {
             if cfg!(debug_assertion) {
                 panic!("Log Gamma Undefined for self < 0")
             }
-            return 0.0   
+            0.0
         } else if self < 10.0 {
             (self + 1.0).lngamma() - self.ln()
         } else {
             let g = 0.5 * ((2.0 * PI_64).ln() - self.ln());
-            let h = g + self * ((self + (1.0 / (12.0 * self - 0.1 / self))).ln() - 1.0);
-            h
+            g + self * ((self + (1.0 / (12.0 * self - 0.1 / self))).ln() - 1.0)
         }
     }
 }
@@ -200,26 +199,26 @@ impl ComplexSqrt for f64 {
 
         if a == 0.0 {
             return Complex::new(a, b);
-        } 
+        }
         if b.is_infinite() {
             return Complex::new(std::f64::INFINITY, b);
         }
         if a.is_nan() {
             return Complex::new(a, std::f64::NAN);
-        } 
+        }
         if a.is_infinite() {
             if a.is_sign_negative() {
-                return Complex::new((b - b).abs(), copysign(a, b))
+                return Complex::new(0.0, copysign(a, b));
             } else {
-                return Complex::new(a , copysign(b - b, b));
+                return Complex::new(a, copysign(0.0, b));
             }
         }
         if a >= 0.0 {
             let t = ((a + a.hypot(b)) * 0.5).sqrt();
-            return Complex::new(t, b / (2.0 * t));
+            Complex::new(t, b / (2.0 * t))
         } else {
             let t = ((a - a.hypot(b)) * 0.5).sqrt();
-            return Complex::new(b.abs() / (2.0 * t), copysign(t, b));
+            Complex::new(b.abs() / (2.0 * t), copysign(t, b))
         }
     }
-} 
+}

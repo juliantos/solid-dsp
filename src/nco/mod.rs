@@ -1,12 +1,11 @@
-
-use std::fmt;
 use std::error::Error;
+use std::fmt;
 
 use num::complex::Complex;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum NCOErrorCode {
-    BandwidthOutOfRange
+    BandwidthOutOfRange,
 }
 
 #[derive(Debug)]
@@ -15,7 +14,7 @@ pub struct NCOError(pub NCOErrorCode);
 impl fmt::Display for NCOError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let error_code = match self.0 {
-            NCOErrorCode::BandwidthOutOfRange => "Bandwidth out Range [0, inf)"
+            NCOErrorCode::BandwidthOutOfRange => "Bandwidth out Range [0, inf)",
         };
         write!(f, "NCO Error {}", error_code)
     }
@@ -29,14 +28,14 @@ pub struct NCO {
     theta: u32,
     delta_theta: u32,
     alpha: f64,
-    beta: f64
+    beta: f64,
 }
 
 impl NCO {
     pub fn new() -> Self {
         let mut table = [0.0; 1024];
-        for i in 0..1024{
-            table[i] = (2.0 * std::f64::consts::PI * (i as f64) / 1024.0).sin();
+        for (i, item) in table.iter_mut().enumerate() {
+            *item = (2.0 * std::f64::consts::PI * (i as f64) / 1024.0).sin();
         }
         let a = 0.1f64;
         let b = a.sqrt();
@@ -45,7 +44,7 @@ impl NCO {
             theta: 0,
             delta_theta: 0,
             alpha: a,
-            beta: b
+            beta: b,
         }
     }
 
@@ -67,7 +66,7 @@ impl NCO {
 
     #[inline]
     pub fn get_frequency(&self) -> f64 {
-        let dt = (self.delta_theta as u64 / 1u64 << 32) as f64 * 2.0f64 * std::f64::consts::PI;
+        let dt = (self.delta_theta as u64 / (1u64 << 32)) as f64 * 2.0f64 * std::f64::consts::PI;
         if dt > std::f64::consts::PI {
             dt - 2.0f64 * std::f64::consts::PI
         } else {
@@ -87,7 +86,7 @@ impl NCO {
 
     #[inline]
     pub fn get_phase(&self) -> f64 {
-        (self.theta as u64 / 1u64 << 32) as f64 * 2.0f64 * std::f64::consts::PI
+        (self.theta as u64 / (1u64 << 32)) as f64 * 2.0f64 * std::f64::consts::PI
     }
 
     #[inline]
@@ -121,9 +120,9 @@ impl NCO {
         Complex::new(self.cos(), self.sin())
     }
 
-    pub fn set_internal_pll_bandwidth(&mut self, bandwidth: f64) -> Result<(), Box<dyn Error>>{
+    pub fn set_internal_pll_bandwidth(&mut self, bandwidth: f64) -> Result<(), Box<dyn Error>> {
         if bandwidth < 0.0 {
-            return Err(Box::new(NCOError(NCOErrorCode::BandwidthOutOfRange)))
+            return Err(Box::new(NCOError(NCOErrorCode::BandwidthOutOfRange)));
         }
 
         self.alpha = bandwidth;
@@ -169,7 +168,7 @@ impl NCO {
         }
 
         output
-    }   
+    }
 }
 
 pub fn constrain(theta: f64) -> u32 {
@@ -177,7 +176,7 @@ pub fn constrain(theta: f64) -> u32 {
     let theta_div_two_pi = theta / (2.0 * std::f64::consts::PI);
     // Take only the fractional part
     let mut fractional_part = theta_div_two_pi.fract();
-    
+
     // Make fractional part positive
     if fractional_part < 0.0 {
         fractional_part += 1.0;
@@ -186,8 +185,18 @@ pub fn constrain(theta: f64) -> u32 {
     (fractional_part * 0xffffffffu32 as f64) as u32
 }
 
+impl Default for NCO {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl fmt::Display for NCO {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "NCO [Theta={}] [ΔTheta={}] [Alpha={}] [Beta={}]", self.theta, self.delta_theta, self.alpha, self.beta)
+        write!(
+            f,
+            "NCO [Theta={}] [ΔTheta={}] [Alpha={}] [Beta={}]",
+            self.theta, self.delta_theta, self.alpha, self.beta
+        )
     }
 }

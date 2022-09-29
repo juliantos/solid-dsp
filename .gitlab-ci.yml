@@ -1,0 +1,79 @@
+stages:
+  - build
+  - test
+  - deploy
+
+rust-build:
+  stage: build
+  image: rust:latest
+  script:
+    - cargo build --verbose --release
+  artifacts:
+    paths:
+      - target
+    expire_in: 3 days
+
+test-latest:
+  stage: test
+  image: rust:latest
+  needs: 
+    - job: rust-build
+      artifacts: true
+  script:
+    - cargo install cargo2junit
+    - cargo test -- -Z unstable-options --format json --report-time | cargo2junit > results.xml
+  artifacts:
+    when: always
+    paths:
+      - results.xml
+    reports:
+      junit: results.xml
+
+lint-latest:
+  stage: test
+  image: rust:latest
+  needs:
+    - job: rust-build
+      artifacts: true
+  script:
+    - rustup component add clippy
+    - cargo clippy -- -D warnings
+  allow_failure: true
+
+audit-latest:
+  stage: test
+  image: rust:latest
+  needs: 
+    - job: rust-build
+      artifacts: true
+  script:
+    - cargo install cargo-audit
+    - cargo audit
+  allow_failure: true
+
+publish-latest:
+  stage: deploy
+  image: alpine
+  needs:
+    - test-latest
+    - lint-latest
+    - audit-latest
+    - job: rust-build
+      artifacts: true
+  script:
+    - apk add httpie
+    - pip install rich --user
+    - cd target
+    - tar -czf build.tar.gz ./* 
+    - "http --ignore-stdin --check-status --follow PUT ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${REF}/build.tar.gz \"JOB-TOKEN: ${CI_JOB_TOKEN}\" @build.tar.gz"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      variables:
+        REF: latest
+    - if: $CI_COMMIT_TAG
+      variables:
+        REF: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH
+      variables:
+        REF: $CI_COMMIT_SHORT_SHA
+

@@ -20,14 +20,14 @@ impl<T: Copy> Window<T> {
         let size = mem::size_of::<T>();
         let layout = match Layout::from_size_align(size * (capacity + delay), alignment) {
             Ok(layout) => layout,
-            _ => panic!("Unable to create Window of {}", capacity + delay)
+            _ => panic!("Unable to create Window of {}", capacity + delay),
         };
         let ptr = unsafe { alloc::alloc::alloc_zeroed(layout) } as *mut T;
 
         Window {
-            layout: layout,
-            delay: delay,
-            capacity: capacity,
+            layout,
+            delay,
+            capacity,
             buffer: ptr,
         }
     }
@@ -35,7 +35,7 @@ impl<T: Copy> Window<T> {
     pub fn as_ptr(&self) -> *const T {
         unsafe {
             let ptr = alloc::alloc::alloc(self.layout) as *mut T;
-            std::ptr::copy(self.buffer.offset(self.delay as isize), ptr, self.capacity);
+            std::ptr::copy(self.buffer.add(self.delay), ptr, self.capacity);
             ptr
         }
     }
@@ -61,9 +61,7 @@ impl<T: Copy> Window<T> {
 
     pub fn push(&mut self, element: T) {
         unsafe {
-            std::ptr::copy(self.buffer,
-                self.buffer.offset(1),
-                self.capacity - 1);
+            std::ptr::copy(self.buffer, self.buffer.offset(1), self.capacity - 1);
         }
 
         unsafe {
@@ -78,7 +76,10 @@ impl<T: Copy> Window<T> {
     }
 }
 
-impl<T: Clone> Clone for Window<T> where T: Copy {
+impl<T: Clone> Clone for Window<T>
+where
+    T: Copy,
+{
     fn clone(&self) -> Self {
         let svec = self.to_vec();
         let mut new_window_buffer = Window::<T>::new(self.capacity, self.delay);
@@ -90,6 +91,10 @@ impl<T: Clone> Clone for Window<T> where T: Copy {
 impl<T: fmt::Display> fmt::Display for Window<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let typename = std::any::type_name::<T>();
-        write!(f, "Window<{}> [Capacity={}] [Delay={}]", typename, self.capacity, self.delay)
+        write!(
+            f,
+            "Window<{}> [Capacity={}] [Delay={}]",
+            typename, self.capacity, self.delay
+        )
     }
 }

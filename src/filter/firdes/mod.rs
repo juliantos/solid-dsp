@@ -1,11 +1,11 @@
 //! Finite Impulse Response Filter Design
-//! 
-//! 
+//!
+//!
 pub mod filter_traits;
 
-use super::super::math::{Sinc, Bessel};
+use super::super::dot_product::{execute::Execute, Direction, DotProduct};
+use super::super::math::{Bessel, Sinc};
 use super::super::windows::kaiser;
-use super::super::dot_product::{DotProduct, Direction, execute::Execute};
 
 use std::error::Error;
 use std::fmt;
@@ -16,12 +16,12 @@ use num::complex::Complex;
 
 #[derive(Debug)]
 enum FirdesErrorCode {
-    InvalidBandwidth,
-    InvalidStopBandLevel,
-    InvalidMu,
-    InvalidSemiLength,
-    InvalidFilterSize,
-    InvalidFFTSize
+    Bandwidth,
+    StopBandLevel,
+    Mu,
+    SemiLength,
+    FilterSize,
+    FFTSize,
 }
 
 #[derive(Debug)]
@@ -30,12 +30,12 @@ struct FirdesError(FirdesErrorCode);
 impl fmt::Display for FirdesError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let error_code = match self.0 {
-            FirdesErrorCode::InvalidBandwidth => "Invalid Bandwidth [0, 0.5]",
-            FirdesErrorCode::InvalidStopBandLevel => "Invalid Stop Band Attenuation (0, inf)",
-            FirdesErrorCode::InvalidMu => "Invalid Mu Range [-0.5, 0.5]",
-            FirdesErrorCode::InvalidSemiLength => "Invalid Filter Semi Length [1, 1000]",
-            FirdesErrorCode::InvalidFilterSize => "Invalid Filter Size [1, inf)",
-            FirdesErrorCode::InvalidFFTSize => "Invalid FFT Size [1, inf)"
+            FirdesErrorCode::Bandwidth => "Invalid Bandwidth [0, 0.5]",
+            FirdesErrorCode::StopBandLevel => "Invalid Stop Band Attenuation (0, inf)",
+            FirdesErrorCode::Mu => "Invalid Mu Range [-0.5, 0.5]",
+            FirdesErrorCode::SemiLength => "Invalid Filter Semi Length [1, 1000]",
+            FirdesErrorCode::FilterSize => "Invalid Filter Size [1, inf)",
+            FirdesErrorCode::FFTSize => "Invalid FFT Size [1, inf)",
         };
         write!(f, "Firdes Error: {}", error_code)
     }
@@ -45,68 +45,80 @@ impl Error for FirdesError {}
 
 pub enum EstimationMethod {
     Kaiser,
-    Herrmann
+    Herrmann,
 }
 
 /// Estimates the required filter length given transition bandwidth and stop-band attenuation
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `transitition_bandwidth` - value between 0.0 and 0.5 relative to the total bandwdith
 /// * `stop_band_attenuation` - stop-band suppression level in dB
 /// * `method` - The estimation method used (either [`EstimationMethod::Kaiser`] or [`EstimationMethod::Herrmann`])
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use solid::filter::firdes::{estimate_required_filter_length, EstimationMethod};
-/// 
+///
 /// let est = match estimate_required_filter_length(0.35, 100.0, EstimationMethod::Herrmann) {
 ///     Ok(len) => len,
 ///     _ => 0
 /// };
-/// 
+///
 /// assert_eq!(est, 15);
 /// ```
-pub fn estimate_required_filter_length(transition_bandwidth: f64, stop_band_attenuation: f64, method: EstimationMethod) -> Result<usize, Box<dyn Error>> {
-    if transition_bandwidth > 0.5 || transition_bandwidth < 0.0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidBandwidth)))
+pub fn estimate_required_filter_length(
+    transition_bandwidth: f64,
+    stop_band_attenuation: f64,
+    method: EstimationMethod,
+) -> Result<usize, Box<dyn Error>> {
+    if !(0.0..=0.5).contains(&transition_bandwidth) {
+        return Err(Box::new(FirdesError(FirdesErrorCode::Bandwidth)));
     } else if stop_band_attenuation <= 0.0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidStopBandLevel)))
+        return Err(Box::new(FirdesError(FirdesErrorCode::StopBandLevel)));
     }
 
     let val = match method {
-        EstimationMethod::Kaiser => estimate_required_filter_length_kaiser(transition_bandwidth, stop_band_attenuation),
-        EstimationMethod::Herrmann => estimate_required_filter_length_herrmann(transition_bandwidth, stop_band_attenuation)
+        EstimationMethod::Kaiser => {
+            estimate_required_filter_length_kaiser(transition_bandwidth, stop_band_attenuation)
+        }
+        EstimationMethod::Herrmann => {
+            estimate_required_filter_length_herrmann(transition_bandwidth, stop_band_attenuation)
+        }
     };
 
     match val {
         Ok(val) => Ok(val as usize),
-        Err(e) => Err(e)
+        Err(e) => Err(e),
     }
 }
 
 /// Estimates the required stop band attenuation given transition bandwidth and filter size
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `transition_bandwidth` - value between 0.0 and 0.5 relative to the total bandwidth
-/// * `filter_length` - the length of the filter 
+/// * `filter_length` - the length of the filter
 /// * `method` - The estimation method used (either [`EstimationMethod::Kaiser`] or [`EstimationMethod::Herrmann`])
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use solid::filter::firdes::{estimate_required_filter_stop_band_attenuation, EstimationMethod};
-/// 
+///
 /// let est = match estimate_required_filter_stop_band_attenuation(0.35, 16, EstimationMethod::Herrmann) {
 ///     Ok(est) => est,
 ///     _ => 0.0
 /// };
-/// 
+///
 /// assert_eq!(est as usize, 101)
 /// ```
-pub fn estimate_required_filter_stop_band_attenuation(transition_bandwidth: f64, filter_length: usize, method: EstimationMethod) -> Result<f64, Box<dyn Error>> {
+pub fn estimate_required_filter_stop_band_attenuation(
+    transition_bandwidth: f64,
+    filter_length: usize,
+    method: EstimationMethod,
+) -> Result<f64, Box<dyn Error>> {
     // Based On Liquid DSP, search between these two stop-bands
     let mut as0 = 0.01;
     let mut as1 = 200.0;
@@ -115,8 +127,12 @@ pub fn estimate_required_filter_stop_band_attenuation(transition_bandwidth: f64,
     for _ in 0..20 {
         as_hat = 0.5 * (as1 + as0);
         let n_hat = match method {
-            EstimationMethod::Kaiser => estimate_required_filter_length_kaiser(transition_bandwidth, as_hat)?,
-            EstimationMethod::Herrmann => estimate_required_filter_length_herrmann(transition_bandwidth, as_hat)?
+            EstimationMethod::Kaiser => {
+                estimate_required_filter_length_kaiser(transition_bandwidth, as_hat)?
+            }
+            EstimationMethod::Herrmann => {
+                estimate_required_filter_length_herrmann(transition_bandwidth, as_hat)?
+            }
         };
 
         if n_hat < filter_length as f64 {
@@ -130,26 +146,30 @@ pub fn estimate_required_filter_stop_band_attenuation(transition_bandwidth: f64,
 }
 
 /// Estimates the required filter transition bandwidth given stop band and filter length
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `stop_band_attenuation` - stop-band suppression level in dB
-/// * `filter_length` - the length of the filter 
+/// * `filter_length` - the length of the filter
 /// * `method` - The estimation method used (either [`EstimationMethod::Kaiser`] or [`EstimationMethod::Herrmann`])
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use solid::filter::firdes::{estimate_required_filter_transition, EstimationMethod};
-/// 
+///
 /// let est = match estimate_required_filter_transition(101.0, 16, EstimationMethod::Herrmann) {
 ///     Ok(est) => (est + 0.005) * 100.0,
 ///     _ => 0.0
 /// };
-/// 
+///
 /// assert_eq!(est as usize, 35)
 /// ```
-pub fn estimate_required_filter_transition(stop_band_attenuation: f64, filter_length: usize, method: EstimationMethod) -> Result<f64, Box<dyn Error>> {
+pub fn estimate_required_filter_transition(
+    stop_band_attenuation: f64,
+    filter_length: usize,
+    method: EstimationMethod,
+) -> Result<f64, Box<dyn Error>> {
     let mut df0 = 0.001;
     let mut df1 = 0.499;
 
@@ -157,8 +177,12 @@ pub fn estimate_required_filter_transition(stop_band_attenuation: f64, filter_le
     for _ in 0..20 {
         df_hat = 0.5 * (df1 + df0);
         let n_hat = match method {
-            EstimationMethod::Kaiser => estimate_required_filter_length_kaiser(df_hat, stop_band_attenuation)?,
-            EstimationMethod::Herrmann => estimate_required_filter_length_herrmann(df_hat, stop_band_attenuation)?
+            EstimationMethod::Kaiser => {
+                estimate_required_filter_length_kaiser(df_hat, stop_band_attenuation)?
+            }
+            EstimationMethod::Herrmann => {
+                estimate_required_filter_length_herrmann(df_hat, stop_band_attenuation)?
+            }
         };
 
         if n_hat < filter_length as f64 {
@@ -172,26 +196,32 @@ pub fn estimate_required_filter_transition(stop_band_attenuation: f64, filter_le
 }
 
 /// Estimates the filter length based on the kaiser method
-pub fn estimate_required_filter_length_kaiser(transition_bandwidth: f64, stop_band_attenuation: f64) -> Result<f64, Box<dyn Error>> {
-    if transition_bandwidth > 0.5 || transition_bandwidth < 0.0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidBandwidth)))
+pub fn estimate_required_filter_length_kaiser(
+    transition_bandwidth: f64,
+    stop_band_attenuation: f64,
+) -> Result<f64, Box<dyn Error>> {
+    if !(0.0..=0.5).contains(&transition_bandwidth) {
+        return Err(Box::new(FirdesError(FirdesErrorCode::Bandwidth)));
     } else if stop_band_attenuation <= 0.0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidStopBandLevel)))
+        return Err(Box::new(FirdesError(FirdesErrorCode::StopBandLevel)));
     }
 
     Ok((stop_band_attenuation - 7.95) / (14.26 * transition_bandwidth))
 }
 
 /// Estimates the filter length based on the herrmann method
-pub fn estimate_required_filter_length_herrmann(transition_bandwidth: f64, stop_band_attenuation: f64) -> Result<f64, Box<dyn Error>> {
-    if transition_bandwidth > 0.5 || transition_bandwidth < 0.0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidBandwidth)))
+pub fn estimate_required_filter_length_herrmann(
+    transition_bandwidth: f64,
+    stop_band_attenuation: f64,
+) -> Result<f64, Box<dyn Error>> {
+    if !(0.0..=0.5).contains(&transition_bandwidth) {
+        return Err(Box::new(FirdesError(FirdesErrorCode::Bandwidth)));
     } else if stop_band_attenuation <= 0.0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidStopBandLevel)))
+        return Err(Box::new(FirdesError(FirdesErrorCode::StopBandLevel)));
     }
 
     if stop_band_attenuation > 105.0 {
-        return Ok((stop_band_attenuation - 7.95) / (14.26 * transition_bandwidth))
+        return Ok((stop_band_attenuation - 7.95) / (14.26 * transition_bandwidth));
     }
 
     let new_stop_band_attenuation = stop_band_attenuation + 7.4;
@@ -201,11 +231,12 @@ pub fn estimate_required_filter_length_herrmann(transition_bandwidth: f64, stop_
     let t1 = d1.log10();
     let t2 = d2.log10();
 
-    let d_inf = (0.005309*t1*t1 + 0.07114*t1 - 0.4761)*t2 - (0.002660*t1*t1 + 0.59410*t1 + 0.4278);
+    let d_inf = (0.005309 * t1 * t1 + 0.07114 * t1 - 0.4761) * t2
+        - (0.002660 * t1 * t1 + 0.59410 * t1 + 0.4278);
 
-    let f = 11.012 + 0.51244*(t1-t2);
+    let f = 11.012 + 0.51244 * (t1 - t2);
 
-    Ok((d_inf - f*transition_bandwidth*transition_bandwidth) / transition_bandwidth + 1.0)    
+    Ok((d_inf - f * transition_bandwidth * transition_bandwidth) / transition_bandwidth + 1.0)
 }
 
 /// Computes the Kaiser Window Beta factor given the target's stop-band attenuation
@@ -222,47 +253,52 @@ pub fn kaiser_beta(stop_band_attenuation: f64) -> f64 {
 }
 
 /// Design FIR Filter Coefficients using Kaiser Window
-/// 
+///
 /// Creates a [`Vec<f64>`] of coefficients using the specified inputs.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `filter_length` - size of the filter in taps
 /// * `cutoff_frequency` - bandwidth of the frequency to remain from (0, 0.5)
 /// * `stop_band_attenuation` - supression in dB (0, inf)
 /// * `fraction_sample_offset` - fractional sample offset (-0.5, 0.5)
-/// 
-/// # Example 
-/// 
+///
+/// # Example
+///
 /// ```
 /// use solid::filter::firdes;
-/// 
+///
 /// let taps = match firdes::firdes_kaiser(8, 0.35, 120.0, 0.0) {
 ///     Ok(taps) => taps,
 ///     _ => vec!()
 /// };
-/// 
+///
 /// assert_eq!(taps.len(), 8);
 /// ```
-pub fn firdes_kaiser(filter_length: usize, cutoff_frequency: f64, stop_band_attenuation: f64, fractional_sample_offset: f64) -> Result<Vec<f64>, Box<dyn Error>> {
-    if fractional_sample_offset < -0.5 || fractional_sample_offset > 0.5 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidMu)))
-    } else if cutoff_frequency > 0.5 || cutoff_frequency < 0.0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidBandwidth)))
+pub fn firdes_kaiser(
+    filter_length: usize,
+    cutoff_frequency: f64,
+    stop_band_attenuation: f64,
+    fractional_sample_offset: f64,
+) -> Result<Vec<f64>, Box<dyn Error>> {
+    if !(-0.5..=0.5).contains(&fractional_sample_offset) {
+        return Err(Box::new(FirdesError(FirdesErrorCode::Mu)));
+    } else if !(0.0..=0.5).contains(&cutoff_frequency) {
+        return Err(Box::new(FirdesError(FirdesErrorCode::Bandwidth)));
     } else if stop_band_attenuation <= 0.0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidStopBandLevel)))
+        return Err(Box::new(FirdesError(FirdesErrorCode::StopBandLevel)));
     }
 
     let beta = kaiser_beta(stop_band_attenuation);
     let mut h: Vec<f64> = vec![0.0; filter_length];
-    for i in 0..filter_length {
+    for (i, tap) in h.iter_mut().enumerate().take(filter_length) {
         let t = i as f64 - ((filter_length - 1) as f64) / 2.0 + fractional_sample_offset;
-        
+
         let h1 = (2.0 * cutoff_frequency * t).sinc();
 
         let h2 = kaiser::kaiser(i, filter_length, beta)?;
 
-        h[i] = h1 * h2;
+        *tap = h1 * h2;
     }
 
     Ok(h)
@@ -271,32 +307,36 @@ pub fn firdes_kaiser(filter_length: usize, cutoff_frequency: f64, stop_band_atte
 /// Design FIR Filter Coefficients based on the notch filter (Band-Stop)
 ///
 /// Creates a [`Vec<f64>`] of coefficients using the specified inputs.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `semi_length` - half size of the filter in taps
 /// * `notch_frequency` - the filter normalized notch frequency (-0.5, 0.5)
 /// * `stop_band_attenuation` - supression in dB (0, inf)
-/// 
-/// # Example 
-/// 
+///
+/// # Example
+///
 /// ```
 /// use solid::filter::firdes;
-/// 
+///
 /// let taps = match firdes::firdes_notch(8, 0.35, 120.0) {
 ///     Ok(taps) => taps,
 ///     _ => vec!()
 /// };
-/// 
+///
 /// assert_eq!(taps.len(), 17);
 /// ```
-pub fn firdes_notch(semi_length: usize, notch_frequency: f64, stop_band_attenuation: f64) -> Result<Vec<f64>, Box<dyn Error>> {
-    if semi_length < 1 || semi_length > 1000 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidSemiLength)))
-    } else if notch_frequency > 0.5 || notch_frequency < 0.0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidBandwidth)))
+pub fn firdes_notch(
+    semi_length: usize,
+    notch_frequency: f64,
+    stop_band_attenuation: f64,
+) -> Result<Vec<f64>, Box<dyn Error>> {
+    if !(1..=1000).contains(&semi_length) {
+        return Err(Box::new(FirdesError(FirdesErrorCode::SemiLength)));
+    } else if !(0.0..=0.5).contains(&notch_frequency) {
+        return Err(Box::new(FirdesError(FirdesErrorCode::Bandwidth)));
     } else if stop_band_attenuation <= 0.0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidStopBandLevel)))
+        return Err(Box::new(FirdesError(FirdesErrorCode::StopBandLevel)));
     }
 
     let beta = kaiser_beta(stop_band_attenuation);
@@ -305,11 +345,11 @@ pub fn firdes_notch(semi_length: usize, notch_frequency: f64, stop_band_attenuat
     let mut h = vec![0.0; h_len];
     let mut scale = 0.0;
 
-    for i in 0..h_len {
+    for (i, tap) in h.iter_mut().enumerate().take(h_len) {
         let tone = -(2.0 * PI_64 * notch_frequency * (i as f64 - semi_length as f64)).cos();
         let window = kaiser::kaiser(i, h_len, beta)?;
-        h[i] = tone * window;
-        scale += h[i] * tone;
+        *tap = tone * window;
+        scale += *tap * tone;
     }
 
     // normalize
@@ -326,32 +366,37 @@ pub fn firdes_notch(semi_length: usize, notch_frequency: f64, stop_band_attenuat
 /// Design FIR Filter Coefficients based on the doppler filter
 ///
 /// Creates a [`Vec<f64>`] of coefficients using the specified inputs.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `filter_length` - size of the filter in taps
 /// * `doppler_frequency` - the filter normalized doppler frequency (0, 0.5)
 /// * `rice_fading_factor` - `K` in dB (0, inf)
 /// * `theta` - LoS component angle of arrival
-/// 
-/// # Example 
-/// 
+///
+/// # Example
+///
 /// ```
 /// use solid::filter::firdes;
-/// 
+///
 /// let taps = match firdes::firdes_doppler(51, 0.1, 2.0, 0.0) {
 ///     Ok(taps) => taps,
 ///     _ => vec!()
 /// };
-/// 
+///
 /// assert_eq!(taps.len(), 51);
 /// ```
-pub fn firdes_doppler(filter_length: usize, doppler_frequency: f64, rice_fading_factor: f64, theta: f64) -> Result<Vec<f64>, Box<dyn Error>> {
+pub fn firdes_doppler(
+    filter_length: usize,
+    doppler_frequency: f64,
+    rice_fading_factor: f64,
+    theta: f64,
+) -> Result<Vec<f64>, Box<dyn Error>> {
     let beta = 4.0;
 
     let mut h = vec![0.0; filter_length];
 
-    for i in 0..filter_length {
+    for (i, tap) in h.iter_mut().enumerate().take(filter_length) {
         // Time sample
         let t = i as f64 - (filter_length as f64 - 1.0) / 2.0;
 
@@ -359,46 +404,47 @@ pub fn firdes_doppler(filter_length: usize, doppler_frequency: f64, rice_fading_
         let j = 1.5 * (2.0 * PI_64 * doppler_frequency * t).abs().besselj(0.0);
 
         // Rice-K component
-        let r = 1.5 * rice_fading_factor / ( rice_fading_factor + 1.0) * (2.0 * PI_64 * doppler_frequency * t * theta.cos()).cos();
+        let r = 1.5 * rice_fading_factor / (rice_fading_factor + 1.0)
+            * (2.0 * PI_64 * doppler_frequency * t * theta.cos()).cos();
 
         // Window
         let w = kaiser::kaiser(i, filter_length, beta)?;
 
         // Composite
-        h[i] = (j + r) * w;
+        *tap = (j + r) * w;
     }
 
     Ok(h)
 }
 
 /// Computes the auto-correlation of a filter at a specific lag
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `filter` - the filter
 /// * `lag` - auto-correlation lag (samples)
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use solid::filter::firdes::{filter_autocorrelation, firdes_notch};
-/// 
+///
 /// let taps = match firdes_notch(25, 0.2, 30.0) {
 ///     Ok(taps) => taps,
 ///     _ => vec!()
 /// };
-/// 
+///
 /// let auto_corr = filter_autocorrelation(&taps, 3);
 /// let rev_auto_corr = filter_autocorrelation(&taps, -3);
-/// 
+///
 /// assert_eq!(auto_corr, rev_auto_corr);
 /// assert_eq!(auto_corr as f32, 0.047983058);
 /// ```
 pub fn filter_autocorrelation(filter: &[f64], lag: isize) -> f64 {
-    let lag : usize = lag.abs() as usize;
+    let lag: usize = lag.unsigned_abs();
 
     if lag >= filter.len() {
-        return 0.0
+        return 0.0;
     }
 
     let mut rxx = 0.0;
@@ -412,39 +458,43 @@ pub fn filter_autocorrelation(filter: &[f64], lag: isize) -> f64 {
 // pub fn filter_autocorrelation_c(filter: &[f64])
 
 /// Computes the cross-correlation of two filters at a specific lag
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `h` - the first filter
 /// * `g` - the second filter
 /// * `lag` - cross-correlation lag (samples)
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use solid::filter::firdes::{filter_crosscorrelation, firdes_kaiser, firdes_notch};
-/// 
+///
 /// let h = match firdes_kaiser(51, 0.35, 120.0, 0.0) {
 ///     Ok(filter) => filter,
 ///     _ => vec!()
 /// };
-/// 
+///
 /// let g = match firdes_notch(25, 0.20, 30.0) {
 ///     Ok(filter) => filter,
 ///     _ => vec!()
 /// };
-/// 
+///
 /// let cross_corr = filter_crosscorrelation(&h, &g, 0);
-/// 
+///
 /// assert_eq!(cross_corr as f32, 0.92825377);
 /// ```
 pub fn filter_crosscorrelation(h: &[f64], g: &[f64], lag: isize) -> f64 {
     if h.len() < g.len() {
-        return filter_crosscorrelation(g, h, lag)
+        return filter_crosscorrelation(g, h, lag);
     }
 
-    if lag <= -(g.len() as isize) { return 0.0 }
-    if lag >= h.len() as isize { return 0.0 }
+    if lag <= -(g.len() as isize) {
+        return 0.0;
+    }
+    if lag >= h.len() as isize {
+        return 0.0;
+    }
 
     let mut ig = 0;
     let mut ih = 0;
@@ -475,34 +525,36 @@ pub fn filter_crosscorrelation(h: &[f64], g: &[f64], lag: isize) -> f64 {
 }
 
 /// Compute the inter-symbol interference (ISI) for both RMS and Max for the filter
-/// 
+///
 /// The size of the filter should equal to (2 * sps * delay + 1)
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `filter` - the filter
 /// * `samples_per_symbol` - filter over sampling rate
 /// * `filter delay` - the delay of the filter in whole int symbols
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use solid::filter::firdes::{firdes_notch, filter_isi};
-/// 
+///
 /// let h = match firdes_notch(25, 0.20, 30.0) {
 ///     Ok(filter) => filter,
 ///     _ => vec!()
 /// };
-/// 
+///
 /// let (rms, max) = filter_isi(&h, 1, 25);
-/// 
+///
 /// assert_eq!(rms as f32, 0.02509764);
 /// assert_eq!(max as f32, 0.061966006);
 /// ```
 pub fn filter_isi(filter: &[f64], samples_per_symbol: usize, filter_delay: usize) -> (f64, f64) {
     if 2 * samples_per_symbol * filter_delay + 1 != filter.len() {
         if cfg!(debug_assertion) {
-            println!("Samples Per Symbol and Filter Delay do not match the filter's coefficient length!");
+            println!(
+                "Samples Per Symbol and Filter Delay do not match the filter's coefficient length!"
+            );
         }
         return (0.0, 0.0);
     }
@@ -513,7 +565,7 @@ pub fn filter_isi(filter: &[f64], samples_per_symbol: usize, filter_delay: usize
     let mut isi_max = 0.0;
     for i in 1..(2 * filter_delay) {
         let e = (filter_autocorrelation(filter, (i * samples_per_symbol) as isize) / rxx0).abs();
-        isi_rms += e*e;
+        isi_rms += e * e;
 
         if i == 1 || e > isi_max {
             isi_max = e;
@@ -524,18 +576,18 @@ pub fn filter_isi(filter: &[f64], samples_per_symbol: usize, filter_delay: usize
 }
 
 /// Compute Relative out-of-band energy
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `filter` the filter
 /// * `cutoff_frequency` - the cutoff frequency to analyze at
 /// * `fft_size` - size of the fft in bins
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use solid::filter::firdes::{firdes_notch, filter_energy};
-/// 
+///
 /// let h = match firdes_notch(25, 0.20, 30.0) {
 ///     Ok(filter) => filter,
 ///     _ => vec!()
@@ -544,16 +596,20 @@ pub fn filter_isi(filter: &[f64], samples_per_symbol: usize, filter_delay: usize
 ///     Ok(e) => e,
 ///     _ => 0.0
 /// };
-/// 
+///
 /// assert_eq!(energy as f32, 0.3152318);
 /// ```
-pub fn filter_energy(filter: &[f64], cutoff_frequency: f64, fft_size: usize) -> Result<f64, Box<dyn Error>> {
-    if cutoff_frequency < 0.0 || cutoff_frequency > 0.5 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidBandwidth)))
-    } else if filter.len() == 0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidFilterSize)))
+pub fn filter_energy(
+    filter: &[f64],
+    cutoff_frequency: f64,
+    fft_size: usize,
+) -> Result<f64, Box<dyn Error>> {
+    if !(0.0..=0.5).contains(&cutoff_frequency) {
+        return Err(Box::new(FirdesError(FirdesErrorCode::Bandwidth)));
+    } else if filter.is_empty() {
+        return Err(Box::new(FirdesError(FirdesErrorCode::FilterSize)));
     } else if fft_size == 0 {
-        return Err(Box::new(FirdesError(FirdesErrorCode::InvalidFFTSize)))
+        return Err(Box::new(FirdesError(FirdesErrorCode::FFTSize)));
     }
 
     let mut ejwt = vec![Complex::<f64>::new(0.0, 0.0); filter.len()];
@@ -566,8 +622,8 @@ pub fn filter_energy(filter: &[f64], cutoff_frequency: f64, fft_size: usize) -> 
     for i in 0..fft_size {
         let f = 0.5 * i as f64 / fft_size as f64;
 
-        for k in 0..filter.len() {
-            ejwt[k] = Complex::from_polar(1.0, 2.0 * PI_64 * f * k as f64);
+        for (k, bin) in ejwt.iter_mut().enumerate().take(filter.len()) {
+            *bin = Complex::from_polar(1.0, 2.0 * PI_64 * f * k as f64);
         }
 
         let v = Execute::execute(&dp, &ejwt);
