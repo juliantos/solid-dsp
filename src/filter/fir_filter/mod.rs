@@ -18,23 +18,28 @@
 //! let filter = FIRFilter::<f64, Complex<f64>>::new(&coefs, 1.0).unwrap();
 //! ```
 
+use crate::window;
+
 use super::super::dot_product::{execute::Execute, Direction, DotProduct};
 use super::super::resources::msb_index;
 use super::super::window::Window;
 
 use std::error::Error;
-use std::fmt;
+use std::{fmt, vec};
 use std::iter::Sum;
 use std::ops::Mul;
 
 use num_traits::Num;
 
 pub mod decimating_fir_filter;
+pub mod interpolating_fir_filter;
 
 #[derive(Debug)]
 pub enum FIRErrorCode {
     CoefficientsLengthZero,
     DecimationLessThanOne,
+    InterpolationLessThanOne,
+    NotEnoughFilters,
 }
 
 #[derive(Debug)]
@@ -119,41 +124,6 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
         self.scale
     }
 
-    /// Pushes a sample _x_ onto the internal buffer of the filter object
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use solid::filter::fir_filter::FIRFilter;
-    /// use num::complex::Complex;
-    ///
-    /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let mut filter = FIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0).unwrap();
-    /// filter.push(Complex::new(4.0, 0.0));
-    /// ```
-    #[inline(always)]
-    pub fn push(&mut self, sample: T) {
-        self.window.push(sample);
-    }
-
-    /// Writes the samples onto the internal buffer of the filter object
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use solid::filter::fir_filter::FIRFilter;
-    /// use num::complex::Complex;
-    ///
-    /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let mut filter = FIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0).unwrap();
-    /// let window = [Complex::new(2.02, 0.0), Complex::new(4.04, 0.0)];
-    /// filter.write(&window);
-    /// ```
-    #[inline(always)]
-    pub fn write(&mut self, samples: &[T]) {
-        self.window.write(samples)
-    }
-
     /// Computes the output sample
     ///
     /// The output is the dot product between the internal coefficients and the internal buffer
@@ -169,17 +139,20 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
     /// let mut filter = FIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0).unwrap();
     /// let window = [Complex::new(2.02, 0.0), Complex::new(4.04, 0.0), Complex::new(1.02, 0.0),
     ///     Complex::new(0.23, 0.0), Complex::new(9.19, 0.0)];
-    /// filter.write(&window);
-    /// let output = filter.execute();
+    /// let mut output;
+    /// for &val in window.iter() {
+    ///     output = filter.execute(val);
+    /// }
     ///
     /// assert_eq!(output, Complex::new(60.03, 0.0));
     /// ```
     #[inline(always)]
-    pub fn execute<Out>(&self) -> Out
+    pub fn execute<Out>(&mut self, sample: T) -> Out
     where
         DotProduct<C>: Execute<T, Output = Out>,
         Out: Mul<C, Output = Out>,
     {
+        self.window.push(sample);
         Execute::execute(&self.coefs, &self.window.to_vec()) * self.scale
     }
 
@@ -196,13 +169,11 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
     ///
     /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
     /// let mut filter = FIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0).unwrap();
-    /// let window = [Complex::new(2.02, 0.0), Complex::new(4.04, 0.0),
-    ///     Complex::new(1.02, 0.0), Complex::new(0.23, 0.0)];
-    /// filter.write(&window);
-    /// let output = filter.execute_block(&vec![Complex::new(9.19, 0.0), Complex::new(1.2, 0.0),
-    ///         Complex::new(3.02, 0.0), Complex::new(0.3, 0.0), Complex::new(90.0, 0.0)]);
+    /// let window = [Complex::new(2.02, 0.0), Complex::new(4.04, 0.0), Complex::new(1.02, 0.0),
+    ///     Complex::new(0.23, 0.0), Complex::new(9.19, 0.0)];
+    /// let output = filter.execute_block(&window);
     ///
-    /// assert_eq!(output[0], Complex::new(60.03, 0.0));
+    /// assert_eq!(output[4], Complex::new(60.03, 0.0));
     /// ```
     #[inline(always)]
     pub fn execute_block<Out>(&mut self, samples: &[T]) -> Vec<Out>
@@ -212,8 +183,7 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
     {
         let mut block: Vec<Out> = vec![];
         for &sample in samples.iter() {
-            self.push(sample);
-            block.push(self.execute());
+            block.push(self.execute(sample));
         }
         block
     }
@@ -280,5 +250,52 @@ impl<C: fmt::Display, T: fmt::Display> fmt::Display for FIRFilter<C, T> {
             self.scale,
             self.coefs
         )
+    }
+}
+
+#[derive(Debug)]
+pub struct FIRFilterBank<C, T> {
+    window: Window<T>,
+    coefs: Vec<DotProduct<C>>,
+}
+
+impl<C: Copy + Num + Sum, T: Copy> FIRFilterBank<C, T> {
+    /// Constructs a new, `FIRFilterBank<C, T>`
+    ///
+    /// Uses the input which represents the discrete coefficients of type `C`
+    /// to create the filter. Does work on type `T` elements.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use solid::filter::fir_filter::FIRFilterBank;
+    /// use num::complex::Complex;
+    /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let filter = FIRFilterBank::<f64, Complex<f64>>::new(&coefficients, 2).unwrap();
+    /// ```
+    pub fn new(coefficients: &[C], filters: usize) -> Result<Self, Box<dyn Error>> {
+        if filters == 0 {
+            return Err(Box::new(FIRError(FIRErrorCode::NotEnoughFilters)));
+        } else if coefficients.is_empty() {
+            return Err(Box::new(FIRError(FIRErrorCode::CoefficientsLengthZero)));
+        }
+    
+        let mut coefs = vec![];
+        let sub_len = coefficients.len() / filters;
+    
+        for filter in 0..filters {
+            let mut rev_sub_coefs = Vec::with_capacity(sub_len);
+            unsafe { rev_sub_coefs.set_len(sub_len) };
+            for index in 0..sub_len {
+                rev_sub_coefs[sub_len - index - 1] = coefficients[filter + index * filters];
+            }
+    
+            coefs.push(DotProduct::new(&rev_sub_coefs, Direction::FORWARD));
+        }
+
+        Ok(FIRFilterBank { 
+            window: Window::new(sub_len, 0), 
+            coefs
+        })
     }
 }
