@@ -62,18 +62,18 @@ pub enum IIRFilterType {
 }
 
 #[derive(Debug)]
-pub struct IIRFilter<C, T> {
+pub struct IIRFilter<Coef, In> {
     iirtype: IIRFilterType,
-    buffer: Window<T>,
-    numerator_coefs: DotProduct<C>,
-    denominator_coefs: DotProduct<C>,
-    second_order_sections: Vec<SecondOrderFilter<C, T>>,
+    buffer: Window<In>,
+    numerator_coefs: DotProduct<Coef>,
+    denominator_coefs: DotProduct<Coef>,
+    second_order_sections: Vec<SecondOrderFilter<Coef, In>>,
 }
 
-impl<C: Copy + Num + Sum, T: Copy> IIRFilter<C, T> {
-    /// Creates and IIR Filter with coeffients of type `C` and takes in data of type `T`
+impl<Coef: Copy + Num + Sum, In: Copy> IIRFilter<Coef, In> {
+    /// Creates and IIR Filter with coeffients of type `Coef` and takes in data of type `In`
     ///
-    /// It should be noted that `T` and `C` are both numerican and can be multiplied and added together.
+    /// It should be noted that `In` and `Coef` are both numerican and can be multiplied and added together.
     ///
     /// Example
     ///
@@ -86,8 +86,8 @@ impl<C: Copy + Num + Sum, T: Copy> IIRFilter<C, T> {
     /// let mut iir_filter = IIRFilter::<f64, Complex<f64>>::new(&filter.0, &filter.1, IIRFilterType::SecondOrder).unwrap();
     /// ```
     pub fn new(
-        feed_forward: &[C],
-        feed_back: &[C],
+        feed_forward: &[Coef],
+        feed_back: &[Coef],
         iirtype: IIRFilterType,
     ) -> Result<Self, Box<dyn Error>> {
         match iirtype {
@@ -175,7 +175,7 @@ impl<C: Copy + Num + Sum, T: Copy> IIRFilter<C, T> {
     /// assert_eq!(numerators.to_vec(),  filter.0);
     /// ```
     #[inline(always)]
-    pub fn numerator_coefs(&self) -> &Vec<C> {
+    pub fn numerator_coefs(&self) -> Vec<Coef> {
         self.numerator_coefs.coefficents()
     }
 
@@ -195,7 +195,7 @@ impl<C: Copy + Num + Sum, T: Copy> IIRFilter<C, T> {
     /// assert_eq!(denominators.to_vec(),  filter.1);
     /// ```
     #[inline(always)]
-    pub fn denominator_coefs(&self) -> &Vec<C> {
+    pub fn denominator_coefs(&self) -> Vec<Coef> {
         self.denominator_coefs.coefficents()
     }
 
@@ -215,7 +215,7 @@ impl<C: Copy + Num + Sum, T: Copy> IIRFilter<C, T> {
     /// assert_eq!(filters.len(), 1);
     /// ```
     #[inline(always)]
-    pub fn second_order_filters(&self) -> &Vec<SecondOrderFilter<C, T>> {
+    pub fn second_order_filters(&self) -> &Vec<SecondOrderFilter<Coef, In>> {
         &self.second_order_sections
     }
 
@@ -237,16 +237,16 @@ impl<C: Copy + Num + Sum, T: Copy> IIRFilter<C, T> {
     }
 }
 
-impl<C: Copy + Num + Sum, T: Copy, Out> Filter<C, T, Out> for IIRFilter<C, T>
+impl<Coef: Copy + Num + Sum, In: Copy, Out> Filter<In, Out> for IIRFilter<Coef, In>
 where 
-    DotProduct<C>: Execute<T, Output = Out>,
-    C: Mul<Complex<f64>, Output = Complex<f64>> + Conj<Output = C> + Real<Output = C>,
-    T: Sub<Out, Output = T>,
-    Out: Sub<Out, Output = T>,
+    DotProduct<Coef>: Execute<In, Out>,
+    Coef: Mul<Complex<f64>, Output = Complex<f64>> + Conj<Output = Coef> + Real<Output = Coef>,
+    In: Sub<Out, Output = In>,
+    Out: Sub<Out, Output = In>,
 {
-    /// Executes type `T` and returns the data type `Out`
+    /// Executes type `In` and returns the data type `Out`
     ///
-    /// `Out` is whatever the data type results in the multiplication of `C` and `T`
+    /// `Out` is whatever the data type results in the multiplication of `Coef` and `In`
     ///
     /// Example
     ///
@@ -260,19 +260,19 @@ where
     ///
     /// let output = iir_filter.execute(1f64);
     ///
-    /// assert_eq!(output, 0.05816769596076701);
+    /// assert_eq!(output[0], 0.05816769596076701);
     ///
     /// ```
-    fn execute(&mut self, input: T) -> Vec<Out> {
+    fn execute(&mut self, input: In) -> Vec<Out> {
         match self.iirtype {
             IIRFilterType::Normal => {
                 let buffer = self.buffer.to_vec();
-                let denom_output = Execute::execute(&self.denominator_coefs, &buffer[..(buffer.len() - 1)]);
+                let denom_output = self.denominator_coefs.execute(&buffer[..(buffer.len() - 1)]);
                 let mixed_output = input - denom_output;
 
                 self.buffer.push(mixed_output);
 
-                vec![Execute::execute(&self.numerator_coefs, &self.buffer.to_vec())]
+                vec![self.numerator_coefs.execute(&self.buffer.to_vec())]
             }
             IIRFilterType::SecondOrder => {
                 let mut int_output = self.second_order_sections[0].execute::<Out>(Left(input));
@@ -284,9 +284,9 @@ where
         }
     }
 
-    /// Executes array of type `T` and returns an array of the data type `Out`
+    /// Executes array of type `In` and returns an array of the data type `Out`
     ///
-    /// `Out` is whatever the data type results in the multiplication of `C` and `T`
+    /// `Out` is whatever the data type results in the multiplication of `Coef` and `In`
     ///
     /// Example
     ///
@@ -303,7 +303,7 @@ where
     /// assert_eq!(output, [0.05816769596076701, 0.119535296293297, 0.18410279587774706, 0.2518701895942824, 0.32283747232307686]);
     ///
     /// ```
-    fn execute_block(&mut self, samples: &[T]) -> Vec<Out> {
+    fn execute_block(&mut self, samples: &[In]) -> Vec<Out> {
         let mut block: Vec<Out> = vec![];
         for &sample in samples.iter() {
             block.append(&mut self.execute(sample));
@@ -341,7 +341,7 @@ where
                             1.0,
                             frequency * 2.0 * std::f64::consts::PI * (i as f64),
                         );
-                    b = b + exp;
+                    b += exp;
                 }
 
                 for (i, &coef) in self.denominator_coefs().iter().enumerate() {
@@ -350,7 +350,7 @@ where
                             1.0,
                             frequency * 2.0 * std::f64::consts::PI * (i as f64),
                         );
-                    a = a + exp;
+                    a += exp;
                 }
 
                 b / a
@@ -359,7 +359,7 @@ where
                 let mut h = Complex::zero();
 
                 for filter in self.second_order_filters() {
-                    h = h * filter.frequency_response(frequency);
+                    h *= filter.frequency_response(frequency);
                 }
 
                 h
@@ -388,7 +388,7 @@ where
     fn group_delay(&self, frequency: f64) -> f64 {
         match self.iir_type() {
             IIRFilterType::Normal => {
-                match iir_group_delay(self.numerator_coefs(), self.denominator_coefs(), frequency) {
+                match iir_group_delay(&self.numerator_coefs(), &self.denominator_coefs(), frequency) {
                     Ok(delay) => delay,
                     Err(e) => {
                         if cfg!(debug_assertions) {

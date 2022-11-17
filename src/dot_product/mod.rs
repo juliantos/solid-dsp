@@ -5,7 +5,7 @@
 //! # Example
 //!
 //! ```
-//! use solid::dot_product::{DotProduct, Direction};
+//! use solid::dot_product::{DotProduct, Direction, execute::*};
 //!
 //! let coefs = [1.0, 2.0, 3.0, 4.0, 5.0];
 //! let dp = DotProduct::new(&coefs, Direction::REVERSE);
@@ -16,22 +16,32 @@
 //! ```
 pub mod execute;
 
-use std::fmt;
+extern crate alloc;
+
+use std::alloc::Layout;
+use std::cmp::{min};
+use std::{fmt, mem, ptr};
 use std::iter::Sum;
-use std::ops::{Index, Mul};
+use std::ops::{Mul, AddAssign};
+
+use num_traits::Num;
+
+use self::execute::Execute;
 
 pub enum Direction {
     FORWARD,
     REVERSE,
 }
 
-#[derive(Debug)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
 pub struct DotProduct<T> {
-    coef: Vec<T>,
+    #[allow(dead_code)]
+    layout: Layout,
+    len: usize,
+    buffer: *mut T
 }
 
-impl<T: Copy + Mul<T, Output = T> + Sum> DotProduct<T> {
+impl<T: Copy + Num + Sum> DotProduct<T> {
     /// Creates a new Dot Product
     ///
     /// Inserts the coefficients in the [`Direction`] specified.
@@ -45,41 +55,33 @@ impl<T: Copy + Mul<T, Output = T> + Sum> DotProduct<T> {
     /// let dp = DotProduct::new(&coefs, Direction::REVERSE);
     /// ```
     pub fn new(coefficients: &[T], direction: Direction) -> Self {
+        let alignment = mem::align_of::<T>();
+        let size = mem::size_of::<T>();
+        let layout = match Layout::from_size_align(size * coefficients.len(), alignment) {
+            Ok(layout) => layout,
+            _ => panic!("Unable to create DotProduct of {}", coefficients.len())
+        };
         let dot_product: DotProduct<T> = match direction {
-            Direction::FORWARD => DotProduct {
-                coef: coefficients.to_vec(),
+            Direction::FORWARD => {
+                let buffer = unsafe { alloc::alloc::alloc(layout) } as *mut T;
+                unsafe { std::ptr::copy(coefficients.as_ptr(), buffer, coefficients.len())}
+                DotProduct {
+                    layout,
+                    len: coefficients.len(),
+                    buffer
+                }
             },
-            Direction::REVERSE => DotProduct {
-                coef: coefficients.iter().copied().rev().collect(),
+            Direction::REVERSE => {
+                let buffer = unsafe { alloc::alloc::alloc(layout) } as *mut T; 
+                unsafe { std::ptr::copy(coefficients.iter().copied().rev().collect::<Vec<T>>().as_ptr(), buffer, coefficients.len()) };
+                DotProduct {
+                    layout,
+                    len: coefficients.len(),
+                    buffer
+                }
             },
         };
         dot_product
-    }
-
-    /// Takes in a vector and applies the internal dot product
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use solid::dot_product::{DotProduct, Direction};
-    ///
-    /// let coefs = [1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let dp = DotProduct::new(&coefs, Direction::REVERSE);
-    /// let mul = vec![1.0; 5];
-    /// let exe = dp.execute(&mul);
-    ///
-    /// assert_eq!(exe, 15.0);
-    /// ```
-    /// TODO[epic=fast]: SIMD, rebuild with different archs in mind
-    #[inline(always)]
-    pub fn execute(&self, samples: &[T]) -> T {
-        let product: T = self
-            .coef
-            .iter()
-            .zip(samples.iter())
-            .map(|(&x, &y)| x * y)
-            .sum();
-        product
     }
 
     /// Gets a reference to the coefficients
@@ -93,10 +95,15 @@ impl<T: Copy + Mul<T, Output = T> + Sum> DotProduct<T> {
     /// let dp = DotProduct::new(&coefs, Direction::FORWARD);
     /// let ref_coefs = dp.coefficents();
     ///
-    /// assert_eq!(coefs, *ref_coefs);
+    /// assert_eq!(coefs, ref_coefs);
     /// ```
-    pub fn coefficents(&self) -> &Vec<T> {
-        &self.coef
+    pub fn coefficents(&self) -> Vec<T> {
+        let mut destination = Vec::with_capacity(self.len);
+        unsafe {
+            ptr::copy(self.buffer, destination.as_mut_ptr(), self.len);
+            destination.set_len(self.len);
+        }
+        destination
     }
 
     /// Gets the length of the coefficients
@@ -113,7 +120,7 @@ impl<T: Copy + Mul<T, Output = T> + Sum> DotProduct<T> {
     /// ```
     #[inline(always)]
     pub fn len(&self) -> usize {
-        self.coef.len()
+        self.len
     }
 
     /// Gets if the coefficients are empty
@@ -130,21 +137,32 @@ impl<T: Copy + Mul<T, Output = T> + Sum> DotProduct<T> {
     /// ```
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.coef.is_empty()
+        self.len == 0
     }
 }
 
 impl<T: fmt::Display> fmt::Display for DotProduct<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let typename = std::any::type_name::<T>();
-        write!(f, "DotProduct<{}> [Size={}]", typename, self.coef.len())
+        write!(f, "DotProduct<{}> [Size={}]", typename, self.len)
     }
 }
-
-impl<T> Index<usize> for DotProduct<T> {
-    type Output = T;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.coef[index]
+impl<T: Copy, I: Copy, O: Num> Execute<I, O> for DotProduct<T> 
+where 
+    T: Mul<I, Output = O>,
+    O: AddAssign
+{
+    #[inline]
+    fn execute(&self, samples: &[I]) -> O {
+        let iterations = min(samples.len(), self.len);
+        let mut sum = O::zero();
+        for (i, &sample) in samples.iter().enumerate().take(iterations) {
+            let value = unsafe {
+                let read_ptr = self.buffer.add(i);
+                ptr::read(read_ptr)
+            };
+            sum += value * sample;
+        }
+        sum
     }
 }

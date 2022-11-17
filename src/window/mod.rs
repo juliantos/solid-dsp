@@ -5,7 +5,7 @@ use std::{mem, ptr};
 
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Window<T> {
     layout: Layout,
     delay: usize,
@@ -76,17 +76,17 @@ impl<T: Copy> Window<T> {
     }
 }
 
-impl<T: Clone> Clone for Window<T>
-where
-    T: Copy,
-{
-    fn clone(&self) -> Self {
-        let svec = self.to_vec();
-        let mut new_window_buffer = Window::<T>::new(self.capacity, self.delay);
-        new_window_buffer.write(&svec);
-        new_window_buffer
-    }
-}
+// impl<T: Clone> Clone for Window<T>
+// where
+//     T: Copy,
+// {
+//     fn clone(&self) -> Self {
+//         let svec = self.to_vec();
+//         let mut new_window_buffer = Window::<T>::new(self.capacity, self.delay);
+//         new_window_buffer.write(&svec);
+//         new_window_buffer
+//     }
+// }
 
 impl<T: fmt::Display> fmt::Display for Window<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

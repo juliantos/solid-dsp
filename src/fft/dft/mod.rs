@@ -1,4 +1,4 @@
-use super::super::dot_product::{Direction, DotProduct};
+use super::super::dot_product::{Direction, DotProduct, execute::*};
 use super::super::fft::{
     DataUnion, Dft, FFTDirection, FFTError, FFTErrorCode, FFTExecuteFunction, FFTFlags, FFTMethod,
     FFTType, FFT,

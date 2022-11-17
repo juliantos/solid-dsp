@@ -91,7 +91,7 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
     /// ```
     pub fn execute<Out>(&mut self, input: Either<T, Out>) -> Out
     where
-        DotProduct<C>: Execute<T, Output = Out>,
+        DotProduct<C>: Execute<T, Out>,
         T: Sub<Out, Output = T>,
         Out: Sub<Out, Output = T>,
     {
@@ -99,7 +99,7 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
         buffer[2] = buffer[1];
         buffer[1] = buffer[0];
 
-        let denom_output = Execute::execute(&self.numerator_coefs, &buffer[1..]);
+        let denom_output = self.numerator_coefs.execute(&buffer[1..]);
 
         let mixed_output = if input.is_left() {
             input.left().unwrap() - denom_output
@@ -110,7 +110,7 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
         self.form_buffer_ii.push(mixed_output);
         let buffer = self.form_buffer_ii.to_vec();
 
-        Execute::execute(&self.denominator_coefs, &buffer)
+        self.denominator_coefs.execute(&buffer)
     }
 
     /// Returns the Numerator Coefs that the second order filter is using
@@ -129,7 +129,7 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
     /// assert_eq!(numerators[1], 0.99999840000128);
     /// ```
     #[inline(always)]
-    pub fn numerator_coefs(&self) -> &Vec<C> {
+    pub fn numerator_coefs(&self) -> Vec<C> {
         self.numerator_coefs.coefficents()
     }
 
@@ -149,7 +149,7 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
     /// assert_eq!(denominators[1], 0.003199997440002048);
     /// ```
     #[inline(always)]
-    pub fn denominator_coefs(&self) -> &Vec<C> {
+    pub fn denominator_coefs(&self) -> Vec<C> {
         self.denominator_coefs.coefficents()
     }
 
@@ -180,11 +180,11 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
 
         for (i, &coef) in coefs_b.iter().enumerate() {
             let polar = Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
-            output_b = output_b + coef * polar;
+            output_b += coef * polar;
         }
         for (i, &coef) in coefs_a.iter().enumerate() {
             let polar = Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
-            output_a = output_a + coef * polar;
+            output_a += coef * polar;
         }
         
         output_b / output_a

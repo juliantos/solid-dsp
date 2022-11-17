@@ -55,19 +55,18 @@ impl fmt::Display for FIRError {
 
 impl Error for FIRError {}
 
-#[derive(Debug)]
-#[allow(dead_code)]
-pub struct FIRFilter<C, T> {
-    scale: C,
-    window: Window<T>,
-    coefs: DotProduct<C>,
+#[derive(Debug, Clone)]
+pub struct FIRFilter<Coef, In> {
+    scale: Coef,
+    window: Window<In>,
+    coefs: DotProduct<Coef>,
 }
 
-impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
-    /// Constructs a new, `FIRFilter<C, T>`
+impl<Coef: Copy + Num + Sum, In: Copy> FIRFilter<Coef, In> {
+    /// Constructs a new, `FIRFilter<Coef, In>`
     ///
-    /// Uses the input which represents the discrete coefficients of type `C`
-    /// to create the filter. Does work on type `T` elements.
+    /// Uses the input which represents the discrete coefficients of type `Coef`
+    /// to create the filter. Does work on type `In` elements.
     ///
     /// # Example
     ///
@@ -77,7 +76,7 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
     /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
     /// let filter = FIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0).unwrap();
     /// ```
-    pub fn new(coefficents: &[C], scale: C) -> Result<Self, Box<dyn Error>> {
+    pub fn new(coefficents: &[Coef], scale: Coef) -> Result<Self, Box<dyn Error>> {
         if coefficents.is_empty() {
             return Err(Box::new(FIRError(FIRErrorCode::CoefficientsLengthZero)));
         }
@@ -90,7 +89,7 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
 
     /// Sets the scale in which the output is multiplied
     ///
-    /// Uses a input of `C` to modify the output scaling
+    /// Uses a input of `Coef` to modify the output scaling
     ///
     /// # Example
     ///
@@ -104,7 +103,7 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
     /// assert_eq!(filter.get_scale(), 2.0);
     /// ```
     #[inline(always)]
-    pub fn set_scale(&mut self, scale: C) {
+    pub fn set_scale(&mut self, scale: Coef) {
         self.scale = scale;
     }
 
@@ -122,7 +121,7 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
     /// assert_eq!(filter.get_scale(), 1.0);
     /// ```
     #[inline(always)]
-    pub fn get_scale(&self) -> C {
+    pub fn get_scale(&self) -> Coef {
         self.scale
     }
 
@@ -174,16 +173,16 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
     /// assert_eq!(coefs, *ref_coefs);
     /// ```
     #[inline(always)]
-    pub fn coefficients(&self) -> &Vec<C> {
+    pub fn coefficients(&self) -> Vec<Coef> {
         self.coefs.coefficents()
     }
 }
 
-impl<C: Copy + Num + Sum, T: Copy, Out> Filter<C, T, Out> for FIRFilter<C, T>
+impl<Coef: Copy + Num + Sum, In: Copy, Out> Filter<In, Out> for FIRFilter<Coef, In>
 where
-    DotProduct<C>: Execute<T, Output = Out>,
-    C: Mul<Complex<f64>, Output = Complex<f64>>,
-    Out: Mul<C, Output = Out>,
+    DotProduct<Coef>: Execute<In, Out>,
+    Coef: Mul<Complex<f64>, Output = Complex<f64>>,
+    Out: Mul<Coef, Output = Out>,
 {
 
     /// Computes the output sample
@@ -204,12 +203,12 @@ where
     ///     Complex::new(0.23, 0.0), Complex::new(9.19, 0.0)];
     /// let mut output = filter.execute(window[0]);
     ///
-    /// assert_eq!(output, Complex::new(10.1, 0.0));
+    /// assert_eq!(output[0], Complex::new(10.1, 0.0));
     /// ```
     #[inline(always)]
-    fn execute(&mut self, sample: T) -> Vec<Out> {
+    fn execute(&mut self, sample: In) -> Vec<Out> {
         self.window.push(sample);
-        vec![Execute::execute(&self.coefs, &self.window.to_vec()) * self.scale]
+        vec![self.coefs.execute(&self.window.to_vec()) * self.scale]
     }
 
     /// Computes a [`Vec<C>`] of output samples
@@ -233,7 +232,7 @@ where
     /// assert_eq!(output[4], Complex::new(60.03, 0.0));
     /// ```
     #[inline(always)]
-    fn execute_block(&mut self, samples: &[T]) -> Vec<Out> {
+    fn execute_block(&mut self, samples: &[In]) -> Vec<Out> {
         let mut block: Vec<Out> = vec![];
         for &sample in samples.iter() {
             block.append(&mut self.execute(sample));
@@ -292,7 +291,7 @@ where
     /// assert_eq!((delay + 0.5) as usize, 12);
     /// ```
     fn group_delay(&self, frequency: f64) -> f64 {
-        match fir_group_delay(self.coefficients(), frequency) {
+        match fir_group_delay(&self.coefficients(), frequency) {
             Ok(delay) => delay,
             Err(e) => {
                 if cfg!(debug_assertions) {
@@ -304,7 +303,7 @@ where
     }
 }
 
-impl<C: fmt::Display, T: fmt::Display> fmt::Display for FIRFilter<C, T> {
+impl<C: fmt::Display, T: fmt::Display + Copy> fmt::Display for FIRFilter<C, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
