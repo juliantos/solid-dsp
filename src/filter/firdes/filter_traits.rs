@@ -1,4 +1,4 @@
-use super::super::fir_filter::FIRFilter;
+use super::super::fir::FIRFilter;
 use super::{filter_autocorrelation, filter_crosscorrelation, filter_energy, filter_isi};
 
 pub trait Firdes {

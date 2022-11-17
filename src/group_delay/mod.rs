@@ -19,6 +19,7 @@ use std::cmp::PartialOrd;
 use std::ops::{Add, Mul};
 
 use num::complex::Complex;
+use num_traits::Num;
 
 static TOLERANCE: f64 = 0.00000000001;
 
@@ -78,18 +79,14 @@ where
 }
 
 /// Function to calculate the IIR Group Delay
-pub fn iir_group_delay<C: Copy, T: Copy>(
+pub fn iir_group_delay<C: Copy + Num, T: Copy>(
     numerator_coefficients: &[C],
     denominator_coefficients: &[C],
     frequency: T,
 ) -> Result<f64, Box<dyn Error>>
 where
-    T: PartialOrd<f64>,
-    T: Mul<f64, Output = f64>,
-    C: Mul<Complex<f64>, Output = Complex<f64>>,
-    C: Mul<C, Output = C>,
-    C: Conj<Output = C>,
-    C: Add<C, Output = C>,
+    T: PartialOrd<f64> + Mul<f64, Output = f64>,
+    C: Mul<Output = C> + Conj<Output = C> + Add<Output = C> + Mul<Complex<f64>, Output = Complex<f64>>
 {
     if numerator_coefficients.is_empty() || denominator_coefficients.is_empty() {
         return Err(Box::new(DelayError(DelayErrorCode::EmptyCoefficients)));
@@ -104,7 +101,7 @@ where
     }
 
     let coefs_len = numerator_coefficients.len() + denominator_coefficients.len() - 1;
-    let mut coefs = Vec::<C>::with_capacity(coefs_len);
+    let mut coefs = vec![C::zero(); coefs_len];
 
     for i in 0..denominator_coefficients.len() {
         for j in 0..numerator_coefficients.len() {

@@ -5,6 +5,7 @@ use super::super::resources::msb_index;
 
 use std::mem::ManuallyDrop;
 
+use num::Zero;
 use num::complex::Complex;
 
 fn fft_reverse_index(i: usize, n: usize) -> usize {
@@ -64,9 +65,7 @@ pub fn radix2_execute(
     fft: &FFT,
     input: &[Complex<f64>],
 ) -> Result<Vec<Complex<f64>>, Box<dyn std::error::Error>> {
-    let mut output = Vec::with_capacity(fft.nfft);
-    let _remaining = output.spare_capacity_mut();
-    unsafe { output.set_len(fft.nfft) };
+    let mut output = vec![Complex::<f64>::zero(); fft.nfft];
 
     if input.len() < fft.nfft {
         return Err(Box::new(FFTError(FFTErrorCode::NotEnoughBuffer)));

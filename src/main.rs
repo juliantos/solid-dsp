@@ -1,6 +1,7 @@
-use solid::filter::fir_filter::interpolating_fir_filter::InterpolatingFIRFilter;
-use solid::filter::firdes::firdes_kaiser;
-use solid::filter::iir_filter::*;
+use solid::filter::Filter;
+use solid::filter::firdes::*;
+use solid::filter::fir::interp::*;
+use solid::filter::iir::*;
 use solid::filter::iirdes;
 use solid::nco::NCO;
 
@@ -30,9 +31,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         imag.push(num.im);
     }
 
-    let coefficients = firdes_kaiser(64, 0.35, 23.0, 0.0)?;
+    let coefficients = firdes_kaiser(50, 0.35, 40.0, 0.0)?;
+    let mut interpolating_filter = InterpolatingFIRFilter::<f64, Complex<f64>>::new(&coefficients, 7)?;
+    let interp_output = interpolating_filter.execute_block(&nco_output);
 
-    let _interpolating_filter = InterpolatingFIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0, 5);
-
+    assert_eq!(nco_output.len() * 7, interp_output.len());
     Ok(())
 }

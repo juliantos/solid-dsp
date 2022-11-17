@@ -6,8 +6,7 @@
 //! # Example
 //!
 //! ```
-//! use solid::filter::fir_filter::FIRFilter;
-//! use solid::filter::filter_traits::Filter;
+//! use solid::filter::fir::FIRFilter;
 //! use solid::filter::firdes;
 //! use num::complex::Complex;
 //!
@@ -18,21 +17,24 @@
 //! let filter = FIRFilter::<f64, Complex<f64>>::new(&coefs, 1.0).unwrap();
 //! ```
 
-use crate::window;
 
 use super::super::dot_product::{execute::Execute, Direction, DotProduct};
+use super::super::group_delay::fir_group_delay;
 use super::super::resources::msb_index;
 use super::super::window::Window;
+use super::Filter;
 
 use std::error::Error;
 use std::{fmt, vec};
 use std::iter::Sum;
 use std::ops::Mul;
 
+use num::{Complex, Zero};
 use num_traits::Num;
 
-pub mod decimating_fir_filter;
-pub mod interpolating_fir_filter;
+pub mod decim;
+pub mod interp;
+pub mod pfb;
 
 #[derive(Debug)]
 pub enum FIRErrorCode {
@@ -70,7 +72,7 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::FIRFilter;
+    /// use solid::filter::fir::FIRFilter;
     /// use num::complex::Complex;
     /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
     /// let filter = FIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0).unwrap();
@@ -93,7 +95,7 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::FIRFilter;
+    /// use solid::filter::fir::FIRFilter;
     /// use num::complex::Complex;
     /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
     /// let mut filter = FIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0).unwrap();
@@ -113,7 +115,7 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::FIRFilter;
+    /// use solid::filter::fir::FIRFilter;
     /// use num::complex::Complex;
     /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
     /// let filter = FIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0).unwrap();
@@ -124,76 +126,12 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
         self.scale
     }
 
-    /// Computes the output sample
-    ///
-    /// The output is the dot product between the internal coefficients and the internal buffer
-    /// and multiplied by the scaling factor
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use solid::filter::fir_filter::FIRFilter;
-    /// use num::complex::Complex;
-    ///
-    /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let mut filter = FIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0).unwrap();
-    /// let window = [Complex::new(2.02, 0.0), Complex::new(4.04, 0.0), Complex::new(1.02, 0.0),
-    ///     Complex::new(0.23, 0.0), Complex::new(9.19, 0.0)];
-    /// let mut output;
-    /// for &val in window.iter() {
-    ///     output = filter.execute(val);
-    /// }
-    ///
-    /// assert_eq!(output, Complex::new(60.03, 0.0));
-    /// ```
-    #[inline(always)]
-    pub fn execute<Out>(&mut self, sample: T) -> Out
-    where
-        DotProduct<C>: Execute<T, Output = Out>,
-        Out: Mul<C, Output = Out>,
-    {
-        self.window.push(sample);
-        Execute::execute(&self.coefs, &self.window.to_vec()) * self.scale
-    }
-
-    /// Computes a [`Vec<C>`] of output samples
-    ///
-    /// The output is the dot product between the internal coefficients and the internal buffer
-    /// and multiplied by the scaling factor
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use solid::filter::fir_filter::FIRFilter;
-    /// use num::complex::Complex;
-    ///
-    /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let mut filter = FIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0).unwrap();
-    /// let window = [Complex::new(2.02, 0.0), Complex::new(4.04, 0.0), Complex::new(1.02, 0.0),
-    ///     Complex::new(0.23, 0.0), Complex::new(9.19, 0.0)];
-    /// let output = filter.execute_block(&window);
-    ///
-    /// assert_eq!(output[4], Complex::new(60.03, 0.0));
-    /// ```
-    #[inline(always)]
-    pub fn execute_block<Out>(&mut self, samples: &[T]) -> Vec<Out>
-    where
-        DotProduct<C>: Execute<T, Output = Out>,
-        Out: Mul<C, Output = Out>,
-    {
-        let mut block: Vec<Out> = vec![];
-        for &sample in samples.iter() {
-            block.push(self.execute(sample));
-        }
-        block
-    }
-
     /// Gets the length of the coefficients
     ///
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::FIRFilter;
+    /// use solid::filter::fir::FIRFilter;
     /// use num::complex::Complex;
     /// let coefs = vec![0.0; 12];
     /// let filter = FIRFilter::<f64, Complex<f64>>::new(&coefs, 1.0).unwrap();
@@ -211,7 +149,7 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::FIRFilter;
+    /// use solid::filter::fir::FIRFilter;
     /// use num::complex::Complex;
     /// let coefs = vec![0.0; 12];
     /// let filter = FIRFilter::<f64, Complex<f64>>::new(&coefs, 1.0).unwrap();
@@ -227,7 +165,7 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::FIRFilter;
+    /// use solid::filter::fir::FIRFilter;
     /// use num::complex::Complex;
     /// let coefs = vec![0.0; 12];
     /// let filter = FIRFilter::<f64, Complex<f64>>::new(&coefs, 1.0).unwrap();
@@ -241,6 +179,131 @@ impl<C: Copy + Num + Sum, T: Copy> FIRFilter<C, T> {
     }
 }
 
+impl<C: Copy + Num + Sum, T: Copy, Out> Filter<C, T, Out> for FIRFilter<C, T>
+where
+    DotProduct<C>: Execute<T, Output = Out>,
+    C: Mul<Complex<f64>, Output = Complex<f64>>,
+    Out: Mul<C, Output = Out>,
+{
+
+    /// Computes the output sample
+    ///
+    /// The output is the dot product between the internal coefficients and the internal buffer
+    /// and multiplied by the scaling factor
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use solid::filter::fir::FIRFilter;
+    /// use solid::filter::Filter;
+    /// use num::complex::Complex;
+    ///
+    /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let mut filter = FIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0).unwrap();
+    /// let window = vec![Complex::new(2.02, 0.0), Complex::new(4.04, 0.0), Complex::new(1.02, 0.0),
+    ///     Complex::new(0.23, 0.0), Complex::new(9.19, 0.0)];
+    /// let mut output = filter.execute(window[0]);
+    ///
+    /// assert_eq!(output, Complex::new(10.1, 0.0));
+    /// ```
+    #[inline(always)]
+    fn execute(&mut self, sample: T) -> Vec<Out> {
+        self.window.push(sample);
+        vec![Execute::execute(&self.coefs, &self.window.to_vec()) * self.scale]
+    }
+
+    /// Computes a [`Vec<C>`] of output samples
+    ///
+    /// The output is the dot product between the internal coefficients and the internal buffer
+    /// and multiplied by the scaling factor
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use solid::filter::fir::FIRFilter;
+    /// use solid::filter::Filter;
+    /// use num::complex::Complex;
+    ///
+    /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
+    /// let mut filter = FIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0).unwrap();
+    /// let window = [Complex::new(2.02, 0.0), Complex::new(4.04, 0.0), Complex::new(1.02, 0.0),
+    ///     Complex::new(0.23, 0.0), Complex::new(9.19, 0.0)];
+    /// let output = filter.execute_block(&window);
+    ///
+    /// assert_eq!(output[4], Complex::new(60.03, 0.0));
+    /// ```
+    #[inline(always)]
+    fn execute_block(&mut self, samples: &[T]) -> Vec<Out> {
+        let mut block: Vec<Out> = vec![];
+        for &sample in samples.iter() {
+            block.append(&mut self.execute(sample));
+        }
+        block
+    }
+
+    /// Computes the Complex Frequency response of the filter
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use solid::filter::fir::FIRFilter;
+    /// use solid::filter::Filter;
+    /// use solid::filter::firdes::*;
+    /// use num::complex::Complex;
+    ///
+    /// let coefs = match firdes_notch(25, 0.35, 120.0) {
+    ///     Ok(coefs) => coefs,
+    ///     _ => vec!()
+    /// };
+    /// let filter = FIRFilter::<f64, f64>::new(&coefs, 1.0).unwrap();
+    /// let response = Filter::frequency_response(&filter, 0.0);
+    ///
+    /// assert_eq!(response.re.round(), 1.0);
+    /// assert_eq!(response.im, 0.0);
+    /// ```
+    fn frequency_response(&self, frequency: f64) -> Complex<f64> {
+        let mut output: Complex<f64> = Complex::zero();
+
+        let coefs = self.coefficients();
+        for (i, coef) in coefs.iter().enumerate() {
+            let out = *coef
+                * Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
+            output += out;
+        }
+        self.get_scale() * output
+    }
+
+    /// Computes the group delay in samples
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use solid::filter::fir::FIRFilter;
+    /// use solid::filter::Filter;
+    /// use solid::filter::firdes;
+    ///
+    /// let coefs = match firdes::firdes_notch(12, 0.35, 120.0) {
+    ///     Ok(coefs) => coefs,
+    ///     _ => vec!()
+    /// };
+    /// let filter = FIRFilter::<f64, f64>::new(&coefs, 1.0).unwrap();
+    /// let delay = Filter::group_delay(&filter, 0.0);
+    ///
+    /// assert_eq!((delay + 0.5) as usize, 12);
+    /// ```
+    fn group_delay(&self, frequency: f64) -> f64 {
+        match fir_group_delay(self.coefficients(), frequency) {
+            Ok(delay) => delay,
+            Err(e) => {
+                if cfg!(debug_assertions) {
+                    println!("{}", e);
+                }
+                0.0
+            }
+        }
+    }
+}
+
 impl<C: fmt::Display, T: fmt::Display> fmt::Display for FIRFilter<C, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -250,52 +313,5 @@ impl<C: fmt::Display, T: fmt::Display> fmt::Display for FIRFilter<C, T> {
             self.scale,
             self.coefs
         )
-    }
-}
-
-#[derive(Debug)]
-pub struct FIRFilterBank<C, T> {
-    window: Window<T>,
-    coefs: Vec<DotProduct<C>>,
-}
-
-impl<C: Copy + Num + Sum, T: Copy> FIRFilterBank<C, T> {
-    /// Constructs a new, `FIRFilterBank<C, T>`
-    ///
-    /// Uses the input which represents the discrete coefficients of type `C`
-    /// to create the filter. Does work on type `T` elements.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use solid::filter::fir_filter::FIRFilterBank;
-    /// use num::complex::Complex;
-    /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
-    /// let filter = FIRFilterBank::<f64, Complex<f64>>::new(&coefficients, 2).unwrap();
-    /// ```
-    pub fn new(coefficients: &[C], filters: usize) -> Result<Self, Box<dyn Error>> {
-        if filters == 0 {
-            return Err(Box::new(FIRError(FIRErrorCode::NotEnoughFilters)));
-        } else if coefficients.is_empty() {
-            return Err(Box::new(FIRError(FIRErrorCode::CoefficientsLengthZero)));
-        }
-    
-        let mut coefs = vec![];
-        let sub_len = coefficients.len() / filters;
-    
-        for filter in 0..filters {
-            let mut rev_sub_coefs = Vec::with_capacity(sub_len);
-            unsafe { rev_sub_coefs.set_len(sub_len) };
-            for index in 0..sub_len {
-                rev_sub_coefs[sub_len - index - 1] = coefficients[filter + index * filters];
-            }
-    
-            coefs.push(DotProduct::new(&rev_sub_coefs, Direction::FORWARD));
-        }
-
-        Ok(FIRFilterBank { 
-            window: Window::new(sub_len, 0), 
-            coefs
-        })
     }
 }

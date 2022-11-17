@@ -18,7 +18,7 @@ impl<C: Copy + Num + Sum, T: Copy> DecimatingFIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::decimating_fir_filter::DecimatingFIRFilter;
+    /// use solid::filter::fir::decim::DecimatingFIRFilter;
     /// use num::complex::Complex;
     /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
     /// let filter = DecimatingFIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0, 2);
@@ -47,7 +47,7 @@ impl<C: Copy + Num + Sum, T: Copy> DecimatingFIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::decimating_fir_filter::DecimatingFIRFilter;
+    /// use solid::filter::fir::decim::DecimatingFIRFilter;
     /// use num::complex::Complex;
     /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
     /// let mut filter = DecimatingFIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0, 2).unwrap();
@@ -67,7 +67,7 @@ impl<C: Copy + Num + Sum, T: Copy> DecimatingFIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::decimating_fir_filter::DecimatingFIRFilter;
+    /// use solid::filter::fir::decim::DecimatingFIRFilter;
     /// use num::complex::Complex;
     /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
     /// let filter = DecimatingFIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0, 2).unwrap();
@@ -85,7 +85,7 @@ impl<C: Copy + Num + Sum, T: Copy> DecimatingFIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::decimating_fir_filter::*;
+    /// use solid::filter::fir::decim::*;
     /// use num::complex::Complex;
     /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
     /// let filter = DecimatingFIRFilter::<f64, Complex<f64>>::new(&coefficients, 1.0, 2).unwrap();
@@ -103,7 +103,7 @@ impl<C: Copy + Num + Sum, T: Copy> DecimatingFIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::decimating_fir_filter::DecimatingFIRFilter;
+    /// use solid::filter::fir::decim::DecimatingFIRFilter;
     /// use num::complex::Complex;
     ///
     /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
@@ -123,7 +123,7 @@ impl<C: Copy + Num + Sum, T: Copy> DecimatingFIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::decimating_fir_filter::DecimatingFIRFilter;
+    /// use solid::filter::fir::decim::DecimatingFIRFilter;
     /// use num::complex::Complex;
     ///
     /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
@@ -146,7 +146,7 @@ impl<C: Copy + Num + Sum, T: Copy> DecimatingFIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::decimating_fir_filter::DecimatingFIRFilter;
+    /// use solid::filter::fir::decim::DecimatingFIRFilter;
     /// use num::complex::Complex;
     ///
     /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
@@ -181,7 +181,7 @@ impl<C: Copy + Num + Sum, T: Copy> DecimatingFIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::decimating_fir_filter::DecimatingFIRFilter;
+    /// use solid::filter::fir::decim::DecimatingFIRFilter;
     /// use num::complex::Complex;
     ///
     /// let coefficients: [f64; 5] = [1.0, 2.0, 3.0, 4.0, 5.0];
@@ -212,7 +212,7 @@ impl<C: Copy + Num + Sum, T: Copy> DecimatingFIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::decimating_fir_filter::DecimatingFIRFilter;
+    /// use solid::filter::fir::decim::DecimatingFIRFilter;
     /// use num::complex::Complex;
     /// let coefs = vec![0.0; 12];
     /// let filter = DecimatingFIRFilter::<f64, Complex<f64>>::new(&coefs, 1.0, 2).unwrap();
@@ -230,7 +230,7 @@ impl<C: Copy + Num + Sum, T: Copy> DecimatingFIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::decimating_fir_filter::DecimatingFIRFilter;
+    /// use solid::filter::fir::decim::DecimatingFIRFilter;
     /// use num::complex::Complex;
     /// let coefs = vec![0.0; 12];
     /// let filter = DecimatingFIRFilter::<f64, Complex<f64>>::new(&coefs, 1.0, 2).unwrap();
@@ -246,7 +246,7 @@ impl<C: Copy + Num + Sum, T: Copy> DecimatingFIRFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::fir_filter::decimating_fir_filter::DecimatingFIRFilter;
+    /// use solid::filter::fir::decim::DecimatingFIRFilter;
     /// use num::complex::Complex;
     /// let coefs = vec![0.0; 12];
     /// let filter = DecimatingFIRFilter::<f64, Complex<f64>>::new(&coefs, 1.0, 2).unwrap();
