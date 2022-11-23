@@ -9,6 +9,7 @@ use super::super::math::poly;
 use std::error::Error;
 use std::fmt;
 
+use num::Zero;
 use num::complex::Complex;
 
 pub enum BandType {
@@ -176,12 +177,8 @@ pub fn bilinear_numerator_denominator(
         return Err(Box::new(IirdesError(IirdesErrorCode::NumeratorSize)));
     }
 
-    let mut numerator_output_digital_filter = Vec::with_capacity(numerator_order);
-    let mut denominator_output_digital_filter = Vec::with_capacity(denominator_order);
-    unsafe {
-        numerator_output_digital_filter.set_len(numerator_order);
-        denominator_output_digital_filter.set_len(denominator_order);
-    }
+    let mut numerator_output_digital_filter = vec![Complex::<f64>::zero(); numerator_order];
+    let mut denominator_output_digital_filter = vec![Complex::<f64>::zero(); denominator_order];
 
     let mut mk = 1.0;
     let poly_1pz = poly::expand_binomial_pm(denominator_order, denominator_order - 1);

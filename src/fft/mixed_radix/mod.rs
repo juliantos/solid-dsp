@@ -3,6 +3,7 @@ use super::super::resources::factor;
 
 use std::mem::ManuallyDrop;
 
+use num::Zero;
 use num::complex::Complex;
 
 fn estimate_mixed_radix(nfft: usize) -> usize {
@@ -87,19 +88,13 @@ pub fn mixed_radix_execute(
     fft: &FFT,
     input: &[Complex<f64>],
 ) -> Result<Vec<Complex<f64>>, Box<dyn std::error::Error>> {
-    let mut output = Vec::with_capacity(fft.nfft);
-    let _remaining = output.spare_capacity_mut();
-    unsafe { output.set_len(fft.nfft) };
+    let mut output = vec![Complex::<f64>::zero(); fft.nfft];
 
     let p_len = unsafe { fft.data.mixed_radix.p };
     let q_len = unsafe { fft.data.mixed_radix.q };
 
-    let mut p_vec = Vec::with_capacity(p_len);
-    let _p_remaining = p_vec.spare_capacity_mut();
-    unsafe { p_vec.set_len(p_len) };
-    let mut q_vec = Vec::with_capacity(q_len);
-    let _q_remaining = q_vec.spare_capacity_mut();
-    unsafe { q_vec.set_len(q_len) };
+    let mut p_vec = vec![Complex::<f64>::zero(); p_len];
+    let mut q_vec = vec![Complex::<f64>::zero(); q_len];
 
     let p_fft = unsafe { &fft.data.mixed_radix.p_fft };
     let q_fft = unsafe { &fft.data.mixed_radix.q_fft };

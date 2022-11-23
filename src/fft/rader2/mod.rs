@@ -3,6 +3,7 @@ use super::super::resources::{modpow, primitive_root_prime};
 
 use std::mem::ManuallyDrop;
 
+use num::Zero;
 use num::complex::Complex;
 
 pub fn create_rader2_plan(nfft: usize, direction: FFTDirection, flags: FFTFlags) -> FFT {
@@ -66,9 +67,7 @@ pub fn rader2_execute(
     fft: &FFT,
     input: &[Complex<f64>],
 ) -> Result<Vec<Complex<f64>>, Box<dyn std::error::Error>> {
-    let mut output = Vec::with_capacity(fft.nfft);
-    let _remaining = output.spare_capacity_mut();
-    unsafe { output.set_len(fft.nfft) };
+    let mut output = vec![Complex::<f64>::zero(); fft.nfft];
 
     let nfft_prime = unsafe { fft.data.rader2.nfft_prime };
     let seq = unsafe { &fft.data.rader2.seq };

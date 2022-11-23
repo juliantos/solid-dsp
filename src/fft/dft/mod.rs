@@ -1,4 +1,4 @@
-use super::super::dot_product::{Direction, DotProduct};
+use super::super::dot_product::{Direction, DotProduct, execute::*};
 use super::super::fft::{
     DataUnion, Dft, FFTDirection, FFTError, FFTErrorCode, FFTExecuteFunction, FFTFlags, FFTMethod,
     FFTType, FFT,
@@ -6,6 +6,7 @@ use super::super::fft::{
 
 use std::mem::ManuallyDrop;
 
+use num::Zero;
 use num::complex::Complex;
 
 const SQRT_3_2: f64 = 0.866025403784439;
@@ -80,9 +81,7 @@ pub fn create_dft_plan(nfft: usize, direction: FFTDirection, flags: FFTFlags) ->
             } else {
                 1.0
             };
-            twiddle = Vec::with_capacity(nfft);
-            let _remaining = twiddle.spare_capacity_mut();
-            unsafe { twiddle.set_len(nfft) };
+            twiddle = vec![Complex::<f64>::zero(); nfft];
 
             for i in 0..nfft {
                 for j in 1..nfft {
@@ -140,11 +139,7 @@ pub fn dft_execute2(
         return Err(Box::new(FFTError(FFTErrorCode::NotEnoughBuffer)));
     }
 
-    let mut output = Vec::with_capacity(2);
-    let _remaining = output.spare_capacity_mut();
-    unsafe {
-        output.set_len(2);
-    }
+    let mut output = vec![Complex::<f64>::zero(); 2];
     output[0] = input[0] + input[1];
     output[1] = input[0] - input[1];
 
@@ -159,9 +154,8 @@ pub fn dft_execute3(
         return Err(Box::new(FFTError(FFTErrorCode::NotEnoughBuffer)));
     }
 
-    let mut output = Vec::with_capacity(3);
-    let _remaining = output.spare_capacity_mut();
-    unsafe { output.set_len(3) };
+    let mut output = vec![Complex::<f64>::zero(); 3];
+
     output[0] = input[0] + input[1] + input[2];
     let ta = input[0] + input[1] * G + input[2] * GI;
     let tb = input[0] + input[1] * GI + input[2] * G;
@@ -188,9 +182,7 @@ pub fn dft_execute4(
         return Err(Box::new(FFTError(FFTErrorCode::NotEnoughBuffer)));
     }
 
-    let mut output = Vec::with_capacity(4);
-    let _remaining = output.spare_capacity_mut();
-    unsafe { output.set_len(4) };
+    let mut output = vec![Complex::<f64>::zero(); 4];
 
     // Reversal
     output[0] = input[0];
@@ -230,9 +222,7 @@ pub fn dft_execute5(
         return Err(Box::new(FFTError(FFTErrorCode::NotEnoughBuffer)));
     }
 
-    let mut output: Vec<Complex<f64>> = Vec::with_capacity(5);
-    let _remaining = output.spare_capacity_mut();
-    unsafe { output.set_len(5) };
+    let mut output = vec![Complex::<f64>::zero(); 5];
 
     output[0] = input[0..5].iter().sum();
 
@@ -262,9 +252,7 @@ pub fn dft_execute6(
         return Err(Box::new(FFTError(FFTErrorCode::NotEnoughBuffer)));
     }
 
-    let mut output: Vec<Complex<f64>> = Vec::with_capacity(6);
-    let _remaining = output.spare_capacity_mut();
-    unsafe { output.set_len(6) };
+    let mut output = vec![Complex::<f64>::zero(); 6];
 
     output[0] = input[0..6].iter().sum();
 
@@ -304,9 +292,7 @@ pub fn dft_execute7(
         return Err(Box::new(FFTError(FFTErrorCode::NotEnoughBuffer)));
     }
 
-    let mut output: Vec<Complex<f64>> = Vec::with_capacity(7);
-    let _remaining = output.spare_capacity_mut();
-    unsafe { output.set_len(7) };
+    let mut output = vec![Complex::<f64>::zero(); 7];
 
     output[0] = input[0..7].iter().sum();
 
@@ -384,9 +370,7 @@ pub fn dft_execute8(
         return Err(Box::new(FFTError(FFTErrorCode::NotEnoughBuffer)));
     }
 
-    let mut output: Vec<Complex<f64>> = Vec::with_capacity(8);
-    let _remaining = output.spare_capacity_mut();
-    unsafe { output.set_len(8) };
+    let mut output = vec![Complex::<f64>::zero(); 8];
 
     output[0] = input[0];
     output[1] = input[4];
@@ -466,9 +450,7 @@ pub fn dft_execute16(
         return Err(Box::new(FFTError(FFTErrorCode::NotEnoughBuffer)));
     }
 
-    let mut output: Vec<Complex<f64>> = Vec::with_capacity(16);
-    let _remaining = output.spare_capacity_mut();
-    unsafe { output.set_len(16) };
+    let mut output = vec![Complex::<f64>::zero(); 16];
 
     output[0] = input[0];
     output[1] = input[8];

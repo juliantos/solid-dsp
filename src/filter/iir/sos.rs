@@ -1,15 +1,18 @@
 // TODO: Documentation, Group Delay. Print Statements
-
 use super::super::super::dot_product::{execute::Execute, Direction, DotProduct};
 use super::super::super::window::Window;
+use super::iir_group_delay;
+
+use crate::math::complex::*;
 
 use std::error::Error;
 use std::fmt;
 use std::iter::Sum;
-use std::ops::Sub;
+use std::ops::{Sub, Mul};
 
 use either::Either;
 
+use num::{Complex, Zero};
 use num_traits::Num;
 
 #[derive(Debug)]
@@ -28,6 +31,7 @@ impl fmt::Display for SecondOrderError {
 
 impl Error for SecondOrderError {}
 
+#[derive(Debug)]
 pub struct SecondOrderFilter<C, T> {
     form_buffer_ii: Window<T>,
     numerator_coefs: DotProduct<C>,
@@ -42,7 +46,7 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::iir_filter::second_order_filter::SecondOrderFilter;
+    /// use solid::filter::iir::sos::SecondOrderFilter;
     /// use num::complex::Complex;
     ///
     /// let (ff_coefs, fb_coefs) = solid::filter::iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
@@ -75,7 +79,7 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
     /// # Example
     ///
     /// ```
-    /// use solid::filter::iir_filter::second_order_filter::SecondOrderFilter;
+    /// use solid::filter::iir::sos::SecondOrderFilter;
     /// use num::complex::Complex;
     ///
     /// let (ff_coefs, fb_coefs) = solid::filter::iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
@@ -87,7 +91,7 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
     /// ```
     pub fn execute<Out>(&mut self, input: Either<T, Out>) -> Out
     where
-        DotProduct<C>: Execute<T, Output = Out>,
+        DotProduct<C>: Execute<T, Out>,
         T: Sub<Out, Output = T>,
         Out: Sub<Out, Output = T>,
     {
@@ -95,7 +99,7 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
         buffer[2] = buffer[1];
         buffer[1] = buffer[0];
 
-        let denom_output = Execute::execute(&self.numerator_coefs, &buffer[1..]);
+        let denom_output = self.numerator_coefs.execute(&buffer[1..]);
 
         let mixed_output = if input.is_left() {
             input.left().unwrap() - denom_output
@@ -106,7 +110,7 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
         self.form_buffer_ii.push(mixed_output);
         let buffer = self.form_buffer_ii.to_vec();
 
-        Execute::execute(&self.denominator_coefs, &buffer)
+        self.denominator_coefs.execute(&buffer)
     }
 
     /// Returns the Numerator Coefs that the second order filter is using
@@ -114,7 +118,7 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
     /// Example
     ///
     /// ```
-    /// use solid::filter::iir_filter::second_order_filter::SecondOrderFilter;
+    /// use solid::filter::iir::sos::SecondOrderFilter;
     /// use num::complex::Complex;
     ///
     /// let (ff_coefs, fb_coefs) = solid::filter::iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
@@ -125,7 +129,7 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
     /// assert_eq!(numerators[1], 0.99999840000128);
     /// ```
     #[inline(always)]
-    pub fn numerator_coefs(&self) -> &Vec<C> {
+    pub fn numerator_coefs(&self) -> Vec<C> {
         self.numerator_coefs.coefficents()
     }
 
@@ -134,7 +138,7 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
     /// Example
     ///
     /// ```
-    /// use solid::filter::iir_filter::second_order_filter::SecondOrderFilter;
+    /// use solid::filter::iir::sos::SecondOrderFilter;
     /// use num::complex::Complex;
     ///
     /// let (ff_coefs, fb_coefs) = solid::filter::iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
@@ -145,7 +149,83 @@ impl<C: Copy + Num + Sum, T: Copy> SecondOrderFilter<C, T> {
     /// assert_eq!(denominators[1], 0.003199997440002048);
     /// ```
     #[inline(always)]
-    pub fn denominator_coefs(&self) -> &Vec<C> {
+    pub fn denominator_coefs(&self) -> Vec<C> {
         self.denominator_coefs.coefficents()
+    }
+
+    /// Computes the Complex Frequency response of the filter
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use solid::filter::iir::sos::SecondOrderFilter;
+    /// use num::complex::Complex;
+    ///
+    /// let (ff_coefs, fb_coefs) = solid::filter::iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
+    /// let second_order_filter = SecondOrderFilter::<f64, f64>::new(&ff_coefs, &fb_coefs).unwrap();
+    /// 
+    /// let freq_res = second_order_filter.frequency_response(0.0);
+    /// 
+    /// assert!(freq_res != Complex::new(0.0, 0.0))
+    /// ```
+    pub fn frequency_response(&self, frequency: f64) -> Complex<f64> 
+    where
+        C: Mul<Complex<f64>, Output = Complex<f64>>
+    {
+        let mut output_b: Complex<f64> = Complex::zero();
+        let mut output_a: Complex<f64> = Complex::zero();
+
+        let coefs_b = self.numerator_coefs();
+        let coefs_a = self.denominator_coefs();
+
+        for (i, &coef) in coefs_b.iter().enumerate() {
+            let polar = Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
+            output_b += coef * polar;
+        }
+        for (i, &coef) in coefs_a.iter().enumerate() {
+            let polar = Complex::from_polar(1.0, frequency * 2.0 * std::f64::consts::PI * (i as f64));
+            output_a += coef * polar;
+        }
+        
+        output_b / output_a
+    }
+
+    /// Computes the Group Delay in samples
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use solid::filter::iir::sos::SecondOrderFilter;
+    /// use num::complex::Complex;
+    ///
+    /// let (ff_coefs, fb_coefs) = solid::filter::iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
+    /// let second_order_filter = SecondOrderFilter::<f64, f64>::new(&ff_coefs, &fb_coefs).unwrap();
+    /// 
+    /// let delay = second_order_filter.group_delay(0.0);
+    /// 
+    /// assert_eq!(delay, 17.6774211296624)
+    /// ```
+    pub fn group_delay(&self, frequency: f64) -> f64 
+    where
+        C: Real<Output = C> + Conj<Output = C> + Mul<Complex<f64>, Output = Complex<f64>>
+    {
+        let mut coefs_b = Vec::<C>::new();
+        let mut coefs_a = Vec::<C>::new();
+
+        for &b in self.numerator_coefs().iter() {
+            coefs_b.push(b);
+        }
+
+        for &a in self.denominator_coefs().iter() {
+            coefs_a.push(a);
+        }
+
+        match iir_group_delay(&coefs_b, &coefs_a, frequency) {
+            Ok(delay) => delay + 2.0,
+            Err(e) => {
+                dbg!(e);
+                0.0
+            }
+        }
     }
 }

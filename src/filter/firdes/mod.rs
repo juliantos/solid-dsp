@@ -626,7 +626,7 @@ pub fn filter_energy(
             *bin = Complex::from_polar(1.0, 2.0 * PI_64 * f * k as f64);
         }
 
-        let v = Execute::execute(&dp, &ejwt);
+        let v = dp.execute(&ejwt);
 
         let e2 = (v * v.conj()).re;
 
