@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use super::*;
 use super::pfb::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct InterpolatingFIRFilter<Coef, In> {
     filterbank: PolyPhaseFilterBank<Coef, In>,
     interpolation: usize,
@@ -40,7 +40,6 @@ impl<Coef: Copy + Num + Sum + Debug, In: Copy> InterpolatingFIRFilter<Coef, In> 
         };
 
         // Effective Filter
-        // FIXME: Init with zeros
         let effective_length = subfilter_len * interpolation;
         let mut effective_coefs: Vec<Coef> = vec![Coef::zero(); coefficents.len()];
         effective_coefs.copy_from_slice(coefficents);

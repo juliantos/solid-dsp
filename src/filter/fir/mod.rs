@@ -55,7 +55,7 @@ impl fmt::Display for FIRError {
 
 impl Error for FIRError {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct FIRFilter<Coef, In> {
     scale: Coef,
     window: Window<In>,

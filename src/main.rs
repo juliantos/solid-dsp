@@ -10,8 +10,10 @@ use std::error::Error;
 
 use num::Complex;
 
-fn test_execute<I: Num, O>(mut filter: Box<dyn Filter<I, O>>) -> Vec<O> {
-    filter.execute(I::zero())
+#[allow(dead_code)]
+fn test_execute<I: Num, O>(mut filter: Box<dyn Filter<I, O>>, input: &[I]) -> (Box<dyn Filter<I, O>>, Vec<O>) {
+    let out = filter.execute_block(input);
+    (filter, out)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -28,7 +30,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let filter = iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0)?;
-    let mut iir_filter = IIRFilter::new(&filter.0, &filter.1, IIRFilterType::SecondOrder)?;
+    let mut iir_filter = IIRFilter::<f64, Complex<f64>>::new(&filter.0, &filter.1, IIRFilterType::SecondOrder)?;
+    let box_iir = Box::new(iir_filter.clone());
     let iir_output = iir_filter.execute_block(&nco_output);
 
     for num in iir_output.iter() {
@@ -38,10 +41,24 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let coefficients = firdes_kaiser(50, 0.35, 40.0, 0.0)?;
     let mut interpolating_filter = InterpolatingFIRFilter::<f64, Complex<f64>>::new(&coefficients, 7)?;
-    let interp_output = interpolating_filter.execute_block(&nco_output);
+    let mut copied_filter = interpolating_filter;
+    let mut cloned_filter = interpolating_filter.clone();
+    let boxed_filter = Box::new(cloned_filter);
 
-    let _returned_output = test_execute(Box::new(interpolating_filter));
-    assert_eq!(nco_output.len() * 7, interp_output.len());
+    let in_out = interpolating_filter.execute(Complex { re: 10.0, im: 11.0 });
+    let co_out = copied_filter.execute(Complex { re: 10.0, im: 11.0 });
+    let cl_out = cloned_filter.execute(Complex { re: 10.0, im: 11.0 });
+    let (mut boxed_filter, bx_out) = test_execute(boxed_filter, &[Complex { re: 10.0, im: 11.0 }]);
+    let rt_out = boxed_filter.execute(Complex { re: 0.0, im: 0.0 });
+    let tr_out = interpolating_filter.execute(Complex { re: 0.0, im: 0.0 });
+
+    assert_eq!(in_out, cl_out);
+    assert_eq!(co_out, bx_out);
+    assert_eq!(rt_out, tr_out);
+
+    let (_, new_iir_output) = test_execute(box_iir, &nco_output);
+
+    dbg!(new_iir_output);
     
     Ok(())
 }
