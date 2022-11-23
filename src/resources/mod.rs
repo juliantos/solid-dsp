@@ -89,7 +89,7 @@ pub fn primitive_root_prime(n: usize) -> usize {
     while n_ > 1 && factors.len() < MAX_FACTORS {
         for k in 2..=n_ {
             if n_ % k == 0 {
-                if factors.iter().find(|&&x| x == k) == None {
+                if factors.iter().find(|&&x| x == k).is_none() {
                     factors.push(k)
                 }
                 n_ /= k;
