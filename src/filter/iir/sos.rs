@@ -31,7 +31,7 @@ impl fmt::Display for SecondOrderError {
 
 impl Error for SecondOrderError {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SecondOrderFilter<C, T> {
     form_buffer_ii: Window<T>,
     numerator_coefs: DotProduct<C>,

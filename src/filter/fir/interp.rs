@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use super::*;
 use super::pfb::*;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct InterpolatingFIRFilter<Coef, In> {
     filterbank: PolyPhaseFilterBank<Coef, In>,
     interpolation: usize,

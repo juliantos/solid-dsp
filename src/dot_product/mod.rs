@@ -33,12 +33,12 @@ pub enum Direction {
     REVERSE,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct DotProduct<T> {
     #[allow(dead_code)]
     layout: Layout,
     len: usize,
-    buffer: *mut T
+    buffer: *const T
 }
 
 impl<T: Copy + Num + Sum> DotProduct<T> {
@@ -170,8 +170,27 @@ where
     }
 }
 
-// impl<T> Drop for DotProduct<T> {
-//     fn drop(&mut self) {
-//         unsafe { alloc::alloc::dealloc(self.buffer as *mut u8, self.layout)}
-//     }
-// }
+impl<T> Clone for DotProduct<T> {
+    fn clone(&self) -> Self {
+        let alignment = mem::align_of::<T>();
+        let size = mem::size_of::<T>();
+        let layout = match Layout::from_size_align(size * self.len, alignment) {
+            Ok(layout) => layout,
+            _ => panic!("Unable to create Window of {}", self.len),
+        };
+        let ptr = unsafe { alloc::alloc::alloc_zeroed(layout) } as *mut T;
+
+        unsafe { std::ptr::copy_nonoverlapping(self.buffer, ptr, self.len) };
+        DotProduct {
+            layout,
+            len: self.len,
+            buffer: ptr
+        }
+    }
+}
+
+impl<T> Drop for DotProduct<T> {
+    fn drop(&mut self) {
+        unsafe { alloc::alloc::dealloc(self.buffer as *mut u8, self.layout)};
+    }
+}

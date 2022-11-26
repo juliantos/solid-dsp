@@ -2,7 +2,7 @@ use std::vec;
 
 use super::*;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct DecimatingFIRFilter<Coef, In> {
     filter: FIRFilter<Coef, In>,
     current_item: usize,

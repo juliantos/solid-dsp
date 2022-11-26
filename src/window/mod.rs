@@ -22,6 +22,7 @@ impl<T: Copy> Window<T> {
             Ok(layout) => layout,
             _ => panic!("Unable to create Window of {}", capacity + delay),
         };
+
         let ptr = unsafe { alloc::alloc::alloc_zeroed(layout) } as *mut T;
 
         Window {
@@ -43,7 +44,7 @@ impl<T: Copy> Window<T> {
     pub fn to_vec(&self) -> Vec<T> {
         let mut destination = Vec::with_capacity(self.capacity);
         unsafe {
-            ptr::copy(self.as_ptr(), destination.as_mut_ptr(), self.capacity);
+            ptr::copy(self.buffer.add(self.delay), destination.as_mut_ptr(), self.capacity);
             destination.set_len(self.capacity);
         }
         destination
@@ -99,9 +100,6 @@ impl<T: fmt::Display> fmt::Display for Window<T> {
     }
 }
 
-
-impl<T> Copy for Window<T> {}
-
 impl<T> Clone for Window<T> {
     fn clone(&self) -> Self {
         let alignment = mem::align_of::<T>();
@@ -118,5 +116,11 @@ impl<T> Clone for Window<T> {
             capacity: self.capacity,
             buffer: ptr
         }
+    }
+}
+
+impl<T> Drop for Window<T> {
+    fn drop(&mut self) {
+        unsafe { alloc::alloc::dealloc(self.buffer as *mut u8, self.layout)}
     }
 }

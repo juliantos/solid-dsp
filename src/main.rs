@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut nco = NCO::new();
     nco.set_frequency(0.1);
     let mut nco_output = Vec::new();
-    for _ in 0..1024 {
+    for _ in 0..10240000 {
         let (r, i) = nco.sincos();
         nco_output.push(Complex::new(r, i));
         nco.step();
@@ -41,24 +41,22 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let coefficients = firdes_kaiser(50, 0.35, 40.0, 0.0)?;
     let mut interpolating_filter = InterpolatingFIRFilter::<f64, Complex<f64>>::new(&coefficients, 7)?;
-    let mut copied_filter = interpolating_filter;
     let mut cloned_filter = interpolating_filter.clone();
-    let boxed_filter = Box::new(cloned_filter);
+    let boxed_filter = Box::new(cloned_filter.clone());
 
     let in_out = interpolating_filter.execute(Complex { re: 10.0, im: 11.0 });
-    let co_out = copied_filter.execute(Complex { re: 10.0, im: 11.0 });
-    let cl_out = cloned_filter.execute(Complex { re: 10.0, im: 11.0 });
+    let co_out = cloned_filter.execute(Complex { re: 10.0, im: 11.0 });
+    let cl_out = cloned_filter.execute(Complex { re: 0.0, im: 0.0 });
     let (mut boxed_filter, bx_out) = test_execute(boxed_filter, &[Complex { re: 10.0, im: 11.0 }]);
     let rt_out = boxed_filter.execute(Complex { re: 0.0, im: 0.0 });
     let tr_out = interpolating_filter.execute(Complex { re: 0.0, im: 0.0 });
 
-    assert_eq!(in_out, cl_out);
-    assert_eq!(co_out, bx_out);
+    assert_eq!(in_out, co_out);
+    assert_eq!(in_out, bx_out);
+    assert_eq!(cl_out, rt_out);
     assert_eq!(rt_out, tr_out);
 
-    let (_, new_iir_output) = test_execute(box_iir, &nco_output);
-
-    dbg!(new_iir_output);
+    let (_, _new_iir_output) = test_execute(box_iir, &nco_output);
     
     Ok(())
 }

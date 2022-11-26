@@ -55,13 +55,13 @@ impl fmt::Display for IIRError {
 
 impl Error for IIRError {}
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum IIRFilterType {
     Normal,
     SecondOrder,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IIRFilter<Coef, In> {
     iirtype: IIRFilterType,
     buffer: Window<In>,

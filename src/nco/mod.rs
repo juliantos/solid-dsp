@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt;
+use std::num::Wrapping;
 
 use num::complex::Complex;
 
@@ -96,7 +97,7 @@ impl NCO {
 
     #[inline]
     fn index(&self) -> usize {
-        (((self.theta + (1 << 21)) >> 22) & 0x3ff) as usize
+        (((Wrapping(self.theta) + Wrapping(1 << 21)) >> 22).0 & 0x3ff) as usize
     }
 
     #[inline]

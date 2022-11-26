@@ -1,16 +1,10 @@
 use super::*;
 
-extern crate alloc;
-
-use alloc::alloc::Layout;
-use std::{mem, ptr};
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct PolyPhaseFilterBank<Coef, In> {
     scale: Coef,
     window: Window<In>,
-    coefs: *mut DotProduct<Coef>,
-    coefs_len: usize
+    coefs: Vec<DotProduct<Coef>>
 }
 
 impl<Coef: Copy + Num + Sum, In: Copy> PolyPhaseFilterBank<Coef, In> {
@@ -33,16 +27,10 @@ impl<Coef: Copy + Num + Sum, In: Copy> PolyPhaseFilterBank<Coef, In> {
         } else if coefficients.is_empty() {
             return Err(Box::new(FIRError(FIRErrorCode::CoefficientsLengthZero)));
         }
-    
-        let alignment = mem::align_of::<DotProduct<Coef>>();
-        let size = mem::size_of::<DotProduct<Coef>>();
-        let layout = match Layout::from_size_align(size * filters, alignment) {
-            Ok(layout) => layout,
-            _ => panic!("Unable to create PFB of {}", filters),
-        };
-        let ptr = unsafe { alloc::alloc::alloc_zeroed(layout) } as *mut DotProduct<Coef>;
+
+        let mut coefs = vec![];
         let sub_len = coefficients.len() / filters;
-    
+
         for filter in 0..filters {
             let mut rev_sub_coefs = vec![Coef::zero(); sub_len];
             for index in 0..sub_len {
@@ -50,17 +38,13 @@ impl<Coef: Copy + Num + Sum, In: Copy> PolyPhaseFilterBank<Coef, In> {
             }
     
             let dp = DotProduct::new(&rev_sub_coefs, Direction::FORWARD);
-            unsafe {
-                let write_ptr = ptr.offset(filter as isize);
-                ptr::write(write_ptr, dp);
-            }
+            coefs.push(dp);
         }
 
         Ok(PolyPhaseFilterBank { 
             scale,
             window: Window::new(sub_len, 0), 
-            coefs: ptr,
-            coefs_len: filters
+            coefs,
         })
     }
 
@@ -76,21 +60,17 @@ impl<Coef: Copy + Num + Sum, In: Copy> PolyPhaseFilterBank<Coef, In> {
 
     #[inline(always)]
     pub fn len(&self) -> usize {
-        self.coefs_len
+        self.coefs.len()
     }
 
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.coefs_len == 0
+        self.coefs.is_empty()
     }
 
     #[inline(always)]
     pub fn coefficents(&self) -> Vec<Vec<Coef>> {
-        let mut vec_coefs = vec![];
-        for i in 1..self.coefs_len {
-            vec_coefs.push(unsafe { (*self.coefs.add(i)).coefficents() });
-        }
-        vec_coefs
+        self.coefs.iter().map(|x| x.coefficents().to_vec()).collect()
     }
 
     #[inline(always)]
@@ -106,6 +86,6 @@ impl<Coef: Copy + Num + Sum, In: Copy> PolyPhaseFilterBank<Coef, In> {
     where
         DotProduct<Coef>: Execute<In, Out>
     {
-        unsafe { (*self.coefs.offset(index as isize)).execute(&self.window.to_vec()) }
+        self.coefs[index].execute(&self.window.to_vec())
     }
 }

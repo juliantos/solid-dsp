@@ -84,13 +84,13 @@ pub fn modpow(base: usize, exp: usize, n: usize) -> usize {
 /// assert_eq!(prime, 3);
 /// ```
 pub fn primitive_root_prime(n: usize) -> usize {
-    let mut factors = Vec::new();
+    let mut factors = Vec::<usize>::new();
     let mut n_ = n - 1;
     while n_ > 1 && factors.len() < MAX_FACTORS {
         for k in 2..=n_ {
             if n_ % k == 0 {
-                if factors.iter().find(|&&x| x == k).is_none() {
-                    factors.push(k)
+                if !factors.iter().any(|&x| x == k) {
+                    factors.push(k);
                 }
                 n_ /= k;
                 break;
@@ -102,7 +102,7 @@ pub fn primitive_root_prime(n: usize) -> usize {
     for g in 2..n {
         h = g;
         let mut is_root = true;
-        for item in &factors {
+        for item in factors.iter() {
             let e = (n - 1) / item;
             if modpow(g, e, n) == 1 {
                 is_root = false;
