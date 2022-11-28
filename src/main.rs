@@ -1,3 +1,4 @@
+use num::Zero;
 use num_traits::Num;
 use solid::filter::Filter;
 use solid::filter::firdes::*;
@@ -6,7 +7,9 @@ use solid::filter::iir::*;
 use solid::filter::iirdes;
 use solid::nco::NCO;
 
+use std::cell::RefCell;
 use std::error::Error;
+use std::rc::Rc;
 
 use num::Complex;
 
@@ -23,7 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut nco = NCO::new();
     nco.set_frequency(0.1);
     let mut nco_output = Vec::new();
-    for _ in 0..10240000 {
+    for _ in 0..102400 {
         let (r, i) = nco.sincos();
         nco_output.push(Complex::new(r, i));
         nco.step();
@@ -57,6 +60,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(rt_out, tr_out);
 
     let (_, _new_iir_output) = test_execute(box_iir, &nco_output);
-    
+
+    let rc_filter = RefCell::new(interpolating_filter.clone());
+    let rc_out = rc_filter.borrow_mut().execute(Complex::zero());
+    let in_out = interpolating_filter.execute(Complex::zero());
+
+    assert_eq!(rc_out, in_out);
+
+    let rc_rc_filter = Rc::new(rc_filter);
+    let rr_out = rc_rc_filter.borrow_mut().execute(Complex::new(1.0, 2.0));
+    let in_out = interpolating_filter.execute(Complex::new(1.0, 2.0));
+
+    assert_eq!(rr_out, in_out);
+
     Ok(())
 }
