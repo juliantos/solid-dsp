@@ -13,10 +13,14 @@ use std::rc::Rc;
 
 use num::Complex;
 
-#[allow(dead_code)]
 fn test_execute<I: Num, O>(mut filter: Box<dyn Filter<I, O>>, input: &[I]) -> (Box<dyn Filter<I, O>>, Vec<O>) {
     let out = filter.execute_block(input);
     (filter, out)
+}
+
+fn test_pass_rc<I: Num, O>(rc_filter: Rc<RefCell<dyn Filter<I, O>>>, input: &[I]) -> Vec<O> {
+    let out = rc_filter.borrow_mut().execute_block(input);
+    out
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -72,6 +76,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let in_out = interpolating_filter.execute(Complex::new(1.0, 2.0));
 
     assert_eq!(rr_out, in_out);
+
+    let rf_out = test_pass_rc(rc_rc_filter.clone(), &[Complex::zero()]);
+    let in_out = interpolating_filter.execute(Complex::zero());
+    let r2_out = rc_rc_filter.borrow_mut().execute(Complex::new(1.0, 2.0));
+    let i2_out = interpolating_filter.execute(Complex::new(1.0, 2.0));
+
+    assert_eq!(Rc::strong_count(&rc_rc_filter), 1);
+
+    assert_eq!(rf_out, in_out);
+    assert_eq!(r2_out, i2_out);
 
     Ok(())
 }
