@@ -10,6 +10,9 @@ use solid::nco::NCO;
 use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::thread;
 
 use num::Complex;
 
@@ -82,10 +85,30 @@ fn main() -> Result<(), Box<dyn Error>> {
     let r2_out = rc_rc_filter.borrow_mut().execute(Complex::new(1.0, 2.0));
     let i2_out = interpolating_filter.execute(Complex::new(1.0, 2.0));
 
+    {
+        let _c = Rc::clone(&rc_rc_filter);
+        assert_eq!(Rc::strong_count(&rc_rc_filter), 2);
+    }
+
     assert_eq!(Rc::strong_count(&rc_rc_filter), 1);
 
     assert_eq!(rf_out, in_out);
     assert_eq!(r2_out, i2_out);
+
+    // let arc_filter = Arc::new(Mutex::new(rc_filter.clone()));
+
+    // let handles = vec![];
+    // for _ in 0..10 {
+    //     let arc_filter = Arc::clone(&arc_filter);
+    //     let handle = thread::spawn(move || {
+    //         let a = arc_filter.lock().unwrap().borrow_mut().execute(Complex::new(10.0, 5.0));
+    //     });
+    //     handles.push(handle);
+    // }
+
+    // for handle in handles {
+    //     handle.join().unwrap();
+    // }
 
     Ok(())
 }
