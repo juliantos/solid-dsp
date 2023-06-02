@@ -5,7 +5,7 @@ use std::{mem, ptr};
 
 use std::fmt;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Window<T> {
     layout: Layout,
     delay: usize,
@@ -22,6 +22,7 @@ impl<T: Copy> Window<T> {
             Ok(layout) => layout,
             _ => panic!("Unable to create Window of {}", capacity + delay),
         };
+
         let ptr = unsafe { alloc::alloc::alloc_zeroed(layout) } as *mut T;
 
         Window {
@@ -43,7 +44,7 @@ impl<T: Copy> Window<T> {
     pub fn to_vec(&self) -> Vec<T> {
         let mut destination = Vec::with_capacity(self.capacity);
         unsafe {
-            ptr::copy(self.as_ptr(), destination.as_mut_ptr(), self.capacity);
+            ptr::copy(self.buffer.add(self.delay), destination.as_mut_ptr(), self.capacity);
             destination.set_len(self.capacity);
         }
         destination
@@ -96,5 +97,30 @@ impl<T: fmt::Display> fmt::Display for Window<T> {
             "Window<{}> [Capacity={}] [Delay={}]",
             typename, self.capacity, self.delay
         )
+    }
+}
+
+impl<T> Clone for Window<T> {
+    fn clone(&self) -> Self {
+        let alignment = mem::align_of::<T>();
+        let size = mem::size_of::<T>();
+        let layout = match Layout::from_size_align(size * (self.capacity + self.delay), alignment) {
+            Ok(layout) => layout,
+            _ => panic!("Unable to create Window of {}", self.capacity + self.delay),
+        };
+        let ptr = unsafe { alloc::alloc::alloc_zeroed(layout) } as *mut T;
+        unsafe { std::ptr::copy_nonoverlapping(self.buffer, ptr, self.capacity) };
+        Window {
+            layout: self.layout,
+            delay: self.delay,
+            capacity: self.capacity,
+            buffer: ptr
+        }
+    }
+}
+
+impl<T> Drop for Window<T> {
+    fn drop(&mut self) {
+        unsafe { alloc::alloc::dealloc(self.buffer as *mut u8, self.layout)}
     }
 }

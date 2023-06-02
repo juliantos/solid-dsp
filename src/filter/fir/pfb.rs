@@ -4,7 +4,7 @@ use super::*;
 pub struct PolyPhaseFilterBank<Coef, In> {
     scale: Coef,
     window: Window<In>,
-    coefs: Vec<DotProduct<Coef>>,
+    coefs: Vec<DotProduct<Coef>>
 }
 
 impl<Coef: Copy + Num + Sum, In: Copy> PolyPhaseFilterBank<Coef, In> {
@@ -27,23 +27,24 @@ impl<Coef: Copy + Num + Sum, In: Copy> PolyPhaseFilterBank<Coef, In> {
         } else if coefficients.is_empty() {
             return Err(Box::new(FIRError(FIRErrorCode::CoefficientsLengthZero)));
         }
-    
+
         let mut coefs = vec![];
         let sub_len = coefficients.len() / filters;
-    
+
         for filter in 0..filters {
             let mut rev_sub_coefs = vec![Coef::zero(); sub_len];
             for index in 0..sub_len {
                 rev_sub_coefs[sub_len - index - 1] = coefficients[filter + index * filters];
             }
     
-            coefs.push(DotProduct::new(&rev_sub_coefs, Direction::FORWARD));
+            let dp = DotProduct::new(&rev_sub_coefs, Direction::FORWARD);
+            coefs.push(dp);
         }
 
         Ok(PolyPhaseFilterBank { 
             scale,
             window: Window::new(sub_len, 0), 
-            coefs
+            coefs,
         })
     }
 
@@ -69,7 +70,7 @@ impl<Coef: Copy + Num + Sum, In: Copy> PolyPhaseFilterBank<Coef, In> {
 
     #[inline(always)]
     pub fn coefficents(&self) -> Vec<Vec<Coef>> {
-        self.coefs.iter().map(|coef| coef.coefficents().to_vec()).collect::<Vec<Vec<Coef>>>()
+        self.coefs.iter().map(|x| x.coefficents().to_vec()).collect()
     }
 
     #[inline(always)]

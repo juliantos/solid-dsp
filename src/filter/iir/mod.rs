@@ -15,6 +15,8 @@
 //! ```
 
 pub mod sos;
+pub mod decim;
+pub mod interp;
 
 use crate::math::complex::Real;
 
@@ -42,6 +44,8 @@ pub enum IIRErrorCode {
     SecondOrderSectionSizeZero,
     SecondOrderSectionSizeMismatch,
     SecondOrderSectionSizeNotMultpleOf3,
+    DecimationLessThanOne,
+    InterpolationLessThanOne
 }
 
 #[derive(Debug)]
@@ -55,13 +59,13 @@ impl fmt::Display for IIRError {
 
 impl Error for IIRError {}
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum IIRFilterType {
     Normal,
     SecondOrder,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IIRFilter<Coef, In> {
     iirtype: IIRFilterType,
     buffer: Window<In>,
@@ -324,7 +328,7 @@ where
     /// let filter = iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
     /// let mut iir_filter = IIRFilter::new(&filter.0, &filter.1, IIRFilterType::SecondOrder).unwrap();
     /// let output = iir_filter.execute_block(&[1.0, 0.0, 1.0, 0.0, 1.0]);
-
+    /// 
     /// let freq_res = iir_filter.frequency_response(0.0);
     /// 
     /// assert_eq!(freq_res, Complex::new(0.0, 0.0));
@@ -380,7 +384,7 @@ where
     /// let filter = iirdes::pll::active_lag(0.02, 1.0 / (2f64).sqrt(), 1000.0).unwrap();
     /// let mut iir_filter = IIRFilter::new(&filter.0, &filter.1, IIRFilterType::SecondOrder).unwrap();
     /// let output = iir_filter.execute_block(&[1.0, 0.0, 1.0, 0.0, 1.0]);
-
+    /// 
     /// let delay = iir_filter.group_delay(0.0);
     /// 
     /// assert_eq!(delay, 19.6774211296624);

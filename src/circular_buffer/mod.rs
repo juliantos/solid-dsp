@@ -15,6 +15,8 @@
 extern crate alloc;
 
 use alloc::alloc::Layout;
+use core::slice;
+use std::ops::{Deref, DerefMut};
 use std::{mem, ptr};
 
 use std::error::Error;
@@ -82,7 +84,7 @@ impl<T> CircularBuffer<T> {
             Ok(layout) => layout,
             Err(_) => panic!("Unable to create Circular Buffer of {}", capacity),
         };
-        let ptr = unsafe { alloc::alloc::alloc(layout) } as *mut T;
+        let ptr = unsafe { alloc::alloc::alloc_zeroed(layout) } as *mut T;
         CircularBuffer {
             layout,
             capacity: capacity as isize,
@@ -111,9 +113,7 @@ impl<T> CircularBuffer<T> {
     /// ```
     pub fn from_vec(vec: Vec<T>) -> Self {
         let mut temp = CircularBuffer::new(vec.len() as isize);
-        unsafe {
-            temp.write(vec.as_ptr(), vec.len()).unwrap_or_default();
-        }
+        temp.append(&vec).unwrap_or_default();
         temp
     }
 
@@ -135,16 +135,14 @@ impl<T> CircularBuffer<T> {
     /// ```
     pub fn from_slice(slice: &[T]) -> Self {
         let mut temp = CircularBuffer::new(slice.len() as isize);
-        unsafe {
-            temp.write(slice.as_ptr(), slice.len()).unwrap_or_default();
-        }
+        temp.append(slice).unwrap_or_default();
         temp
     }
 
     /// Returns a raw pointer to the start of the buffer
     ///
-    /// This function also re-linearizes the data so that the data
-    /// at the front of the function is in order and not wrapped
+    /// This function does not linearize the data and therefore is probably invalid.
+    /// Should make sure to call linearize before calling the ptr.
     ///
     /// The caller also must make sure that the Circular Buffer outlives
     /// the pointer this function returns, otherwise it will point to garbage.
@@ -164,6 +162,62 @@ impl<T> CircularBuffer<T> {
     /// ```
     #[inline]
     pub fn as_ptr(&self) -> *const T {
+        self.buffer
+    }
+
+
+    /// Returns a raw pointer to the start of the buffer
+    ///
+    /// This function also re-linearizes the data so that the data
+    /// at the front of the function is in order and not wrapped
+    ///
+    /// The caller also must make sure that the Circular Buffer outlives
+    /// the pointer this function returns, otherwise it will point to garbage.
+    /// Modifying the Circular Buffer also may invalidate the pointer.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mut buffer = solid::circular_buffer::CircularBuffer::<u8>::new(10);
+    /// let buffer_ptr = buffer.as_mut_ptr();
+    ///
+    /// unsafe {
+    ///     for i in 0..buffer.len() {
+    ///         assert_eq!(*buffer_ptr.add(i as usize), 0);
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    pub fn as_mut_ptr(&mut self) -> *mut T {
+        self.linearize();
+        self.buffer
+    }
+
+    /// Linearizes the data in the Circular Buffer
+    /// 
+    /// Data should now be in order, read index at 0 and write index at 
+    /// a positive offset.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// let mut buffer = solid::circular_buffer::CircularBuffer::<u8>::new(10);
+    /// buffer.append(&[1, 2, 3, 4]);
+    /// let val = buffer.pop().unwrap();
+    /// 
+    /// let ptr = buffer.as_ptr();
+    /// assert_eq!(val, 1);
+    /// assert_eq!(buffer[0], 1);
+    /// assert_eq!(buffer.read_index(), 1);
+    /// assert_eq!(buffer.write_index(), 4);
+    /// buffer.linearize();
+    /// let ptr = buffer.as_ptr();
+    /// assert_eq!(buffer[0], 2);
+    /// assert_eq!(buffer.read_index(), 0);
+    /// assert_eq!(buffer.write_index(), 3);
+    /// 
+    /// ```
+    pub fn linearize(&mut self) {
         unsafe {
             let ptr = alloc::alloc::alloc(self.layout) as *mut T;
             std::ptr::copy(
@@ -176,7 +230,10 @@ impl<T> CircularBuffer<T> {
                 ptr.offset(self.capacity - self.read_index),
                 (self.read_index) as usize,
             );
-            ptr
+            alloc::alloc::dealloc(self.buffer as *mut u8, self.layout);
+            self.buffer = ptr;
+            self.write_index = (self.write_index - self.read_index) % self.capacity;
+            self.read_index = 0;
         }
     }
 
@@ -188,18 +245,25 @@ impl<T> CircularBuffer<T> {
     /// # Example
     ///
     /// ```
+    /// use std::ptr;
+    /// 
     /// let mut buffer = solid::circular_buffer::CircularBuffer::<u8>::new(10);
+    /// buffer.push(1);
     /// let buffer_vec = buffer.to_vec();
+    /// let ptr = buffer.as_mut_ptr();
+    /// 
     /// for i in 0..buffer_vec.len() {
-    ///     assert_eq!(buffer_vec[i], 0);
+    ///     let val = unsafe{ ptr::read(ptr.add(i)) };
+    ///     assert_eq!(buffer_vec[i], val);
     /// }
     /// ```
     #[inline]
     pub fn to_vec(&self) -> Vec<T> {
         let mut destination = Vec::with_capacity(self.capacity as usize);
         unsafe {
-            ptr::copy(self.as_ptr(), destination.as_mut_ptr(), self.len() as usize);
-            destination.set_len(self.len() as usize);
+            std::ptr::copy(self.buffer.offset(self.read_index), destination.as_mut_ptr(), (self.capacity - self.read_index) as usize);
+            std::ptr::copy(self.buffer, destination.as_mut_ptr().offset(self.capacity - self.read_index), self.read_index as usize);
+            destination.set_len(self.capacity as usize);
         }
         destination
     }
@@ -218,7 +282,6 @@ impl<T> CircularBuffer<T> {
     ///
     /// buffer.push(1);
     /// assert_eq!(buffer.len(), 1);
-    ///
     /// buffer.reset();
     /// assert_eq!(buffer.len(), 0);
     /// ```
@@ -399,31 +462,33 @@ impl<T> CircularBuffer<T> {
     /// use ::solid::circular_buffer::{CircularBuffer, BufferError, BufferErrorCode};
     /// let mut buffer = CircularBuffer::<u8>::new(4);
     ///
-    /// unsafe { assert_eq!(buffer.write(vec!(2,3,4,5).as_ptr(), 4).unwrap(), ()); }
+    /// assert_eq!(buffer.append(&vec!(2,3,4,5)).unwrap(), ());
     ///
-    /// unsafe { assert_eq!(buffer.write(vec!(6).as_ptr(), 1).unwrap_err().downcast_ref::<BufferError>().unwrap().0, BufferErrorCode::NotEnoughBuffer); }
+    /// assert_eq!(buffer.append(&vec!(6)).unwrap_err().downcast_ref::<BufferError>().unwrap().0, BufferErrorCode::NotEnoughBuffer);
     /// ```
-    pub unsafe fn write(&mut self, other: *const T, size: usize) -> Result<(), Box<dyn Error>> {
-        if self.num_elements + size as isize > self.capacity {
+    pub fn append(&mut self, other: &[T]) -> Result<(), Box<dyn Error>> {
+        if self.num_elements + other.len() as isize > self.capacity {
             Err(Box::new(BufferError(BufferErrorCode::NotEnoughBuffer)))
-        } else if size as isize <= self.capacity - self.write_index {
-            std::ptr::copy_nonoverlapping(other, self.buffer.offset(self.write_index), size);
-            self.write_index = (self.write_index + size as isize) % self.capacity;
-            self.num_elements += size as isize;
+        } else if other.len() as isize <= self.capacity - self.write_index {
+            unsafe { std::ptr::copy_nonoverlapping(other.as_ptr(), self.buffer.offset(self.write_index), other.len()); }
+            self.write_index = (self.write_index + other.len() as isize) % self.capacity;
+            self.num_elements += other.len() as isize;
             Ok(())
         } else {
-            std::ptr::copy_nonoverlapping(
-                other,
-                self.buffer.offset(self.write_index),
-                (self.capacity - self.write_index) as usize,
-            );
-            std::ptr::copy_nonoverlapping(
-                other.offset(size as isize - (self.capacity - self.write_index)),
-                self.buffer,
-                size - (self.capacity - self.write_index) as usize,
-            );
-            self.write_index = (self.write_index + size as isize) % self.capacity;
-            self.num_elements += size as isize;
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    other.as_ptr(),
+                    self.buffer.offset(self.write_index),
+                    (self.capacity - self.write_index) as usize,
+                );
+                std::ptr::copy_nonoverlapping(
+                    other.as_ptr().offset(other.len() as isize - (self.capacity - self.write_index)),
+                    self.buffer,
+                    other.len() - (self.capacity - self.write_index) as usize,
+                );
+            }
+            self.write_index = (self.write_index + other.len() as isize) % self.capacity;
+            self.num_elements += other.len() as isize;
             Ok(())
         }
     }
@@ -505,14 +570,41 @@ impl<T> Drop for CircularBuffer<T> {
 
 impl<T: Clone> Clone for CircularBuffer<T> {
     fn clone(&self) -> Self {
-        let ptr: *const T = self.as_ptr();
-        let mut new_circular_buffer = CircularBuffer::<T>::new(self.capacity());
-        unsafe {
-            match new_circular_buffer.write(ptr, self.num_elements as usize) {
-                Ok(_) => new_circular_buffer,
-                Err(_) => panic!("Failed to Clone Circular Buffer!"),
-            }
+        let ptr: *const T = self.deref().as_ptr();
+        let alignment = mem::align_of::<T>();
+        let size = mem::size_of::<T>();
+        let layout = match Layout::from_size_align(size * self.capacity as usize, alignment) {
+            Ok(layout) => layout,
+            Err(_) => panic!("Unable to create Circular Buffer of {}", self.capacity),
+        };
+
+        let buffer = unsafe { alloc::alloc::alloc(layout) } as *mut T;
+        unsafe { std::ptr::copy_nonoverlapping(ptr, buffer, self.capacity as usize); }
+
+        CircularBuffer { 
+            layout, 
+            capacity: self.capacity, 
+            buffer, 
+            read_index: self.read_index, 
+            write_index: self.write_index, 
+            num_elements: self.num_elements
         }
+    }
+}
+
+impl<T> Deref for CircularBuffer<T> {
+    type Target = [T];
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        unsafe { slice::from_raw_parts(self.buffer, self.len() as usize) }
+    }
+}
+
+impl<T> DerefMut for CircularBuffer<T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len() as usize) }
     }
 }
 

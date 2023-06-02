@@ -33,12 +33,12 @@ pub enum Direction {
     REVERSE,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct DotProduct<T> {
     #[allow(dead_code)]
     layout: Layout,
     len: usize,
-    buffer: *mut T
+    buffer: *const T
 }
 
 impl<T: Copy + Num + Sum> DotProduct<T> {
@@ -61,10 +61,11 @@ impl<T: Copy + Num + Sum> DotProduct<T> {
             Ok(layout) => layout,
             _ => panic!("Unable to create DotProduct of {}", coefficients.len())
         };
+        let buffer = unsafe { alloc::alloc::alloc_zeroed(layout) } as *mut T;
+
         let dot_product: DotProduct<T> = match direction {
             Direction::FORWARD => {
-                let buffer = unsafe { alloc::alloc::alloc(layout) } as *mut T;
-                unsafe { std::ptr::copy(coefficients.as_ptr(), buffer, coefficients.len())}
+                unsafe { std::ptr::copy_nonoverlapping(coefficients.as_ptr(), buffer, coefficients.len())}
                 DotProduct {
                     layout,
                     len: coefficients.len(),
@@ -72,8 +73,9 @@ impl<T: Copy + Num + Sum> DotProduct<T> {
                 }
             },
             Direction::REVERSE => {
-                let buffer = unsafe { alloc::alloc::alloc(layout) } as *mut T; 
-                unsafe { std::ptr::copy(coefficients.iter().copied().rev().collect::<Vec<T>>().as_ptr(), buffer, coefficients.len()) };
+                let mut rev_coefs = coefficients.to_vec();
+                rev_coefs.reverse();
+                unsafe { std::ptr::copy(rev_coefs.as_ptr(), buffer, coefficients.len()) };
                 DotProduct {
                     layout,
                     len: coefficients.len(),
@@ -147,6 +149,7 @@ impl<T: fmt::Display> fmt::Display for DotProduct<T> {
         write!(f, "DotProduct<{}> [Size={}]", typename, self.len)
     }
 }
+
 impl<T: Copy, I: Copy, O: Num> Execute<I, O> for DotProduct<T> 
 where 
     T: Mul<I, Output = O>,
@@ -164,5 +167,30 @@ where
             sum += value * sample;
         }
         sum
+    }
+}
+
+impl<T> Clone for DotProduct<T> {
+    fn clone(&self) -> Self {
+        let alignment = mem::align_of::<T>();
+        let size = mem::size_of::<T>();
+        let layout = match Layout::from_size_align(size * self.len, alignment) {
+            Ok(layout) => layout,
+            _ => panic!("Unable to create Window of {}", self.len),
+        };
+        let ptr = unsafe { alloc::alloc::alloc_zeroed(layout) } as *mut T;
+
+        unsafe { std::ptr::copy_nonoverlapping(self.buffer, ptr, self.len) };
+        DotProduct {
+            layout,
+            len: self.len,
+            buffer: ptr
+        }
+    }
+}
+
+impl<T> Drop for DotProduct<T> {
+    fn drop(&mut self) {
+        unsafe { alloc::alloc::dealloc(self.buffer as *mut u8, self.layout)};
     }
 }
