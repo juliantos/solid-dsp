@@ -16,6 +16,7 @@
 
 pub mod sos;
 pub mod decim;
+pub mod interp;
 
 use crate::math::complex::Real;
 
@@ -43,7 +44,8 @@ pub enum IIRErrorCode {
     SecondOrderSectionSizeZero,
     SecondOrderSectionSizeMismatch,
     SecondOrderSectionSizeNotMultpleOf3,
-    DecimationLessThanOne
+    DecimationLessThanOne,
+    InterpolationLessThanOne
 }
 
 #[derive(Debug)]
